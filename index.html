@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CosmoChute — Machines That Live on the Moon</title>
+  <meta name="description" content="CosmoChute builds reusable robotic infrastructure for the lunar surface. Rovers that traverse, systems that survive the 354-hour night, and payload hosting that turns the Moon into a workplace." />
+  <meta property="og:title" content="CosmoChute — Lunar Infrastructure Systems" />
+  <meta property="og:description" content="The lunar economy will not be built on expendable hardware. We build the machines that refuse to die on the Moon." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Chakra+Petch:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='none' stroke='%23ffb43c' stroke-width='2'/><circle cx='21' cy='12' r='4' fill='%23ffb43c'/></svg>" />
+</head>
+<body>
+
+  <!-- ============ BOOT SCREEN ============ -->
+  <div id="boot" aria-hidden="true">
+    <div class="boot-inner">
+      <div class="boot-logo">COSMO<span>CHUTE</span></div>
+      <div class="boot-line" id="boot-line">INITIALIZING LUNAR SYSTEMS…</div>
+      <div class="boot-bar"><div class="boot-bar-fill" id="boot-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- ============ WEBGL SCENE ============ -->
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div id="skyfade" aria-hidden="true"></div>
+  <div id="grain" aria-hidden="true"></div>
+
+  <!-- ============ NAV ============ -->
+  <header id="nav">
+    <a class="logo" href="#top">COSMO<span>CHUTE</span></a>
+    <nav class="nav-links">
+      <a href="#problem">THE PROBLEM</a>
+      <a href="#stack">THE STACK</a>
+      <a href="#capabilities">CAPABILITIES</a>
+      <a href="#manifesto">MISSION</a>
+    </nav>
+    <a class="nav-cta" href="#manifesto">FLY A PAYLOAD</a>
+  </header>
+
+  <!-- ============ MISSION PHASE RAIL ============ -->
+  <aside id="phase-rail" aria-hidden="true">
+    <div class="rail-track"><div class="rail-fill" id="rail-fill"></div><div class="rail-dot" id="rail-dot"></div></div>
+    <div class="rail-labels">
+      <span data-phase="day">DAY</span>
+      <span data-phase="dusk">DUSK</span>
+      <span data-phase="night">NIGHT</span>
+      <span data-phase="dawn">DAWN</span>
+    </div>
+  </aside>
+
+  <!-- ============ TELEMETRY HUD ============ -->
+  <div id="telemetry" aria-hidden="true">
+    <span class="tl-item"><i class="tl-dot"></i><span id="tl-phase">LUNAR DAY</span></span>
+    <span class="tl-item" id="tl-temp">SURFACE +106°C</span>
+    <span class="tl-item" id="tl-sun">SUN EL 41°</span>
+  </div>
+
+  <main id="top">
+
+    <!-- ============ 1 · HERO ============ -->
+    <section id="hero" class="section">
+      <div class="hero-inner">
+        <div class="hero-eyebrow reveal">LUNAR INFRASTRUCTURE SYSTEMS</div>
+        <div class="hero-ticks" id="hero-ticks">
+          <div class="tick"><span class="tick-index">01</span>354 HOURS OF NIGHT.</div>
+          <div class="tick"><span class="tick-index">02</span>MINUS 180 DEGREES.</div>
+          <div class="tick"><span class="tick-index">03</span>VACUUM. RADIATION. RAZOR DUST.</div>
+          <div class="tick tick-accent"><span class="tick-index">04</span>EVERY MACHINE SENT THERE HAS DIED THERE.</div>
+        </div>
+        <h1 class="hero-title">
+          <span class="ht-line">WE BUILD THE</span>
+          <span class="ht-line">MACHINES THAT</span>
+          <span class="ht-line ht-accent">LIVE ON THE MOON</span>
+        </h1>
+        <p class="hero-sub reveal">Reusable robotic infrastructure engineered for sustained operations
+        on the lunar surface — through the day, through the night, again and again.</p>
+        <div class="hero-ctas reveal">
+          <a class="btn btn-solid" href="#stack">EXPLORE THE STACK</a>
+          <a class="btn btn-ghost" href="#manifesto">PARTNER WITH US</a>
+        </div>
+      </div>
+      <div class="scroll-hint" aria-hidden="true">
+        <span>SCROLL — THE SUN IS GOING DOWN</span>
+        <div class="scroll-line"></div>
+      </div>
+    </section>
+
+    <!-- ============ 2 · PROBLEM (SUNSET) ============ -->
+    <section id="problem" class="section">
+      <div class="content-block">
+        <div class="kicker reveal">// THE PROBLEM</div>
+        <h2 class="display reveal-lines">
+          <span>EVERY LUNAR MISSION</span>
+          <span>EVER FLOWN WAS A</span>
+          <span class="accent">ONE-WAY TRIP.</span>
+        </h2>
+        <p class="lede reveal">When the sun sets, the surface drops to −180°C for fourteen Earth days.
+        Landers freeze. Rovers become monuments. Billions in engineering are abandoned
+        after weeks of use — sunk cost with the mission barely begun.</p>
+        <div class="stat-row">
+          <div class="stat reveal">
+            <div class="stat-num" data-count="354">0</div>
+            <div class="stat-unit">HOURS</div>
+            <div class="stat-label">of unbroken darkness, every lunar night</div>
+          </div>
+          <div class="stat reveal">
+            <div class="stat-num"><span data-count="180">0</span></div>
+            <div class="stat-unit">−°C</div>
+            <div class="stat-label">surface temperature in shadow</div>
+          </div>
+          <div class="stat reveal">
+            <div class="stat-num" data-count="0">0</div>
+            <div class="stat-unit">MISSIONS</div>
+            <div class="stat-label">historically designed for reuse</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 3 · THESIS (NIGHTFALL) ============ -->
+    <section id="thesis" class="section">
+      <div class="content-block content-center">
+        <div class="kicker reveal">// THE THESIS</div>
+        <h2 class="display display-big reveal-lines">
+          <span>THE LUNAR ECONOMY</span>
+          <span>WILL NOT BE BUILT ON</span>
+          <span class="accent">EXPENDABLE HARDWARE.</span>
+        </h2>
+        <p class="lede lede-center reveal">Extra-terrestrial exploration is the next frontier of human progress.
+        We build the reusable, interoperable robotics needed to sustainably unlock the Moon's
+        vast mineral, fuel, and scientific potential.</p>
+        <div class="thesis-sig reveal">— THE COSMOCHUTE MISSION</div>
+      </div>
+    </section>
+
+    <!-- ============ 4 · THE STACK (DEEP NIGHT) ============ -->
+    <section id="stack">
+      <div id="stack-pin">
+        <div class="stack-head">
+          <div class="kicker">// INTRODUCING</div>
+          <h2 class="stack-title">THE COSMOCHUTE STACK</h2>
+          <div class="stack-sub">ONE INTEGRATED LUNAR ARCHITECTURE. LIT UP IN THE DARK.</div>
+        </div>
+
+        <div class="stack-panels">
+          <article class="stack-panel" data-model="epoc">
+            <div class="sp-index">SYS 01 / 03</div>
+            <h3 class="sp-name">EPOC</h3>
+            <div class="sp-role">MODULAR REUSABLE ROVER</div>
+            <p class="sp-desc">The workhorse. Autonomous navigation with real-time hazard avoidance,
+            interchangeable payload bays, and a robotic arm for payload swaps, sampling and regolith
+            work. Engineered as a persistent asset that improves with every deployment cycle.</p>
+            <ul class="sp-tags"><li>AUTONOMOUS</li><li>MODULAR BAYS</li><li>ROBOTIC ARM</li><li>240 KG</li></ul>
+          </article>
+
+          <article class="stack-panel" data-model="oasys">
+            <div class="sp-index">SYS 02 / 03</div>
+            <h3 class="sp-name">OASYS</h3>
+            <div class="sp-role">PAYLOAD CARRIER TRAILER</div>
+            <p class="sp-desc">The haulage. A towable trailer with standardized 8U bays — 64U+ of
+            capacity, up to 120 kg of customer payloads — kept safe in transit and deployed
+            sequentially, anywhere EPOC can drive.</p>
+            <ul class="sp-tags"><li>64U+ BAYS</li><li>120 KG</li><li>SEQUENTIAL DEPLOY</li><li>ROVER DOCKING</li></ul>
+          </article>
+
+          <article class="stack-panel" data-model="cartridge">
+            <div class="sp-index">SYS 03 / 03</div>
+            <h3 class="sp-name">CARTRIDGE</h3>
+            <div class="sp-role">PAYLOAD SURVIVAL SYSTEM</div>
+            <p class="sp-desc">The lifeboat. Passive thermal control, power and data through the
+            354-hour lunar night. Your experiment stays warm, powered, and talking to Earth —
+            while everything else on the surface goes dark.</p>
+            <ul class="sp-tags"><li>PASSIVE THERMAL</li><li>300 W</li><li>EARTH DOWNLINK</li><li>NIGHT-RATED</li></ul>
+          </article>
+        </div>
+
+        <div class="stack-progress" aria-hidden="true">
+          <span class="stp" data-i="0">EPOC</span><span class="stp" data-i="1">OASYS</span><span class="stp" data-i="2">CARTRIDGE</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 5 · CAPABILITIES (PRE-DAWN) ============ -->
+    <section id="capabilities" class="section">
+      <div class="content-block content-wide">
+        <div class="kicker reveal">// CAPABILITIES</div>
+        <h2 class="display reveal-lines">
+          <span>YOUR PAYLOAD.</span>
+          <span class="accent">DELIVERED. POWERED. ALIVE.</span>
+        </h2>
+        <div class="cap-grid">
+          <div class="cap reveal">
+            <div class="cap-num">C-01</div>
+            <h3>SURVIVE THE NIGHT</h3>
+            <p>Passive thermal architecture holds payloads between −40°C and +85°C through
+            fourteen days of darkness. Multi-layer insulation, radiative rejection, no drama.</p>
+          </div>
+          <div class="cap reveal">
+            <div class="cap-num">C-02</div>
+            <h3>REACH THE DARK</h3>
+            <p>PSR-capable hosting. Operate inside permanently shadowed regions — where the ice,
+            and the future fuel economy of the solar system, is waiting.</p>
+          </div>
+          <div class="cap reveal">
+            <div class="cap-num">C-03</div>
+            <h3>STAY CONNECTED</h3>
+            <p>Continuous power and Earth downlink. Your experiment data lands in your inbox,
+            not in the regolith. 300 W peak to your payload.</p>
+          </div>
+          <div class="cap reveal">
+            <div class="cap-num">C-04</div>
+            <h3>TOUCH THE SURFACE</h3>
+            <p>Robotic regolith access, sample collection and handling, and hosting for optical
+            science. Direct interaction with the Moon, on demand.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 6 · THE CYCLE (SUNRISE) ============ -->
+    <section id="cycle" class="section">
+      <div class="content-block content-center">
+        <div class="kicker reveal">// 354 HOURS LATER</div>
+        <h2 class="display display-big reveal-lines">
+          <span>THEN THE SUN RISES.</span>
+          <span class="accent">AND WE GO BACK TO WORK.</span>
+        </h2>
+        <p class="lede lede-center reveal">Not a mission. A cycle. Land once, operate for years —
+        infrastructure that compounds instead of hardware that expires.</p>
+        <div class="cycle-steps" id="cycle-steps">
+          <span>LAND</span><i>→</i><span>DEPLOY</span><i>→</i><span>OPERATE</span><i>→</i><span>ENDURE</span><i>→</i><span>WAKE</span><i>→</i><span class="accent">REDEPLOY</span>
+        </div>
+      </div>
+      <div class="specs-strip reveal" id="specs">
+        <div class="spec"><b>240<em> KG</em></b><span>EPOC ROVER, DRY</span></div>
+        <div class="spec"><b>130<em> KG</em></b><span>OASYS TRAILER</span></div>
+        <div class="spec"><b>120<em> KG</em></b><span>TOTAL PAYLOAD</span></div>
+        <div class="spec"><b>64U<em>+</em></b><span>PAYLOAD CAPACITY</span></div>
+        <div class="spec"><b>−40 / +85<em> °C</em></b><span>PAYLOAD ENVIRONMENT</span></div>
+        <div class="spec"><b>300<em> W</em></b><span>PEAK PAYLOAD POWER</span></div>
+      </div>
+    </section>
+
+    <!-- ============ 7 · MANIFESTO / CTA (DAY AGAIN) ============ -->
+    <section id="manifesto" class="section">
+      <div class="content-block content-center">
+        <h2 class="display display-huge reveal-lines">
+          <span>THE MOON ISN'T</span>
+          <span>A DESTINATION.</span>
+          <span class="accent">IT'S A CONSTRUCTION SITE.</span>
+        </h2>
+        <p class="manifesto-line reveal">BECAUSE PERMANENCE ISN'T PROMISED. IT'S ENGINEERED.</p>
+        <div class="hero-ctas reveal">
+          <a class="btn btn-solid" href="mailto:contact@cosmochute.com">FLY YOUR PAYLOAD</a>
+          <a class="btn btn-ghost" href="mailto:contact@cosmochute.com">PARTNER WITH US</a>
+        </div>
+        <div class="vision-tag reveal">VISION — TO BE THE BIGGEST OFF-EARTH ROBOTICS COMPANY</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer id="footer">
+    <div class="foot-left">
+      <div class="logo">COSMO<span>CHUTE</span></div>
+      <p>Reusable infrastructure for sustained lunar operations.</p>
+    </div>
+    <div class="foot-links">
+      <a href="#stack">PLATFORM</a>
+      <a href="#thesis">MISSION</a>
+      <a href="mailto:contact@cosmochute.com">CONTACT</a>
+    </div>
+    <div class="foot-meta">
+      <span>© 2026 COSMOCHUTE</span>
+      <span>EARTH · MOON · ONWARD</span>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
