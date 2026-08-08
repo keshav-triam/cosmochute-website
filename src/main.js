@@ -1,16 +1,18 @@
 // ============================================================
 // Orchestration: boot sequence, scroll-driven day–night cycle,
-// camera choreography, text reveals, HUD telemetry.
+// camera choreography, the end-to-end mission, text reveals,
+// HUD telemetry.
 //
 // NOTE ON ORDER: ScrollTrigger refreshes triggers in creation
 // order, and pin spacers shift everything below them — so the
-// stack pin MUST be created before any trigger for content that
-// sits after #stack in the document.
+// stack pin and mission pin MUST be created before any trigger
+// for content that sits after them in the document.
 // ============================================================
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 import { createWorld } from './scene.js';
+import { buildMission, T as MT, STAGE_STARTS } from './mission.js';
 
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
@@ -72,7 +74,7 @@ const bootMsgs = [
   'INITIALIZING LUNAR SYSTEMS…',
   'THERMAL CORE… NOMINAL',
   'NAV STACK… NOMINAL',
-  'EARTH DOWNLINK… LOCKED',
+  'RELAY ORBITER… LOCKED',
 ];
 
 let bootStarted = false;
@@ -117,7 +119,6 @@ function startHero(instant) {
 }
 
 window.addEventListener('load', runBoot);
-// safety: if load hangs (slow fonts), boot anyway
 setTimeout(runBoot, 2200);
 
 // ============================================================
@@ -129,9 +130,9 @@ const poses = {
   thesis:      { x: 2.5,  y: 3.8, z: 12.5, tx: 0,    ty: 1.6,  tz: -6 },
   epoc:        { x: 2.7,  y: 1.5, z: 3.6,  tx: 0,    ty: 0.9,  tz: 0 },
   oasys:       { x: -1.0, y: 1.5, z: 4.6,  tx: -3.4, ty: 0.8,  tz: 0.9 },
-  cartridge:   { x: 4.9,  y: 1.3, z: 1.4,  tx: 3.1,  ty: 0.85, tz: -1.4 },
-  capabilities:{ x: 0,    y: 2.8, z: 9.5,  tx: 0,    ty: 1.0,  tz: 0 },
+  cartridge:   { x: 4.9,  y: 1.3, z: 1.4,  tx: 3.1,  ty: 0.95, tz: -1.4 },
   cycle:       { x: -3.5, y: 2.0, z: 9.5,  tx: 1.5,  ty: 1.2,  tz: -3 },
+  capabilities:{ x: 0,    y: 2.8, z: 9.5,  tx: 0,    ty: 1.0,  tz: 0 },
   manifesto:   { x: 0,    y: 2.5, z: 11.5, tx: 0,    ty: 1.1,  tz: 0 },
 };
 
@@ -189,7 +190,9 @@ const stackTl = gsap.timeline({
   scrollTrigger: {
     trigger: '#stack-pin',
     start: 'top top',
-    end: '+=300%',
+    // function-based pixel end: a "%" end re-measures against the pin's
+    // own spacer on refresh and compounds without bound
+    end: () => `+=${window.innerHeight * 3}`,
     pin: true,
     scrub: 0.6,
     onUpdate: (self) => {
@@ -200,15 +203,12 @@ const stackTl = gsap.timeline({
 });
 
 stackTl
-  // hold EPOC
   .to({}, { duration: 0.6 })
-  // EPOC → OASYS
   .to(panels[0], { opacity: 0, y: -24, duration: 0.25 })
   .set(panels[0], { visibility: 'hidden' })
   .set(panels[1], { visibility: 'visible', y: 24 })
   .to(panels[1], { opacity: 1, y: 0, duration: 0.3 }, '-=0.05')
   .to({}, { duration: 0.6 })
-  // OASYS → CARTRIDGE
   .to(panels[1], { opacity: 0, y: -24, duration: 0.25 })
   .set(panels[1], { visibility: 'hidden' })
   .set(panels[2], { visibility: 'visible', y: 24 })
@@ -216,31 +216,62 @@ stackTl
   .to({}, { duration: 0.7 });
 
 if (world) {
-  // camera moves inside the pin, aligned with the panel swaps
   stackTl.to(cs, { ...poses.oasys, duration: 0.55, ease: 'power1.inOut' }, 0.6);
   stackTl.to(cs, { ...poses.cartridge, duration: 0.55, ease: 'power1.inOut' }, 2.05);
 }
 
-// --- 5. CAPABILITIES ---
+// --- 5. CYCLE (sunrise — the segue into the mission) ---
+camTween('#cycle', poses.cycle);
+revealsIn('#cycle');
+
+// --- 6. THE MISSION: pinned end-to-end campaign ---
+const missionTicks = gsap.utils.toArray('#mission-rail .mt');
+const missionTel = document.getElementById('mission-tel');
+const STAGE_TAGS = [
+  'E1O1 // INTEGRATION', 'E1O1 // LANDING', 'E1O1 // EGRESS',
+  'E1O1 // PAYLOAD 01', 'E1O1 // SWAP', 'E1O1 // PAYLOADS 02–08',
+  'E1O1 // TRAILER HEAVEN', 'E1O2 // OUTBOUND',
+];
+
+let missionST = null;
+if (world) {
+  const missionTl = gsap.timeline({
+    scrollTrigger: {
+      trigger: '#mission-pin',
+      start: 'top top',
+      // function-based pixel end — see stack pin note
+      end: () => `+=${Math.round(window.innerHeight * 8.5)}`,
+      pin: true,
+      scrub: 0.6,
+      onUpdate: (self) => {
+        const t = self.progress * MT.end;
+        let idx = 0;
+        for (let i = 0; i < STAGE_STARTS.length; i++) if (t >= STAGE_STARTS[i]) idx = i;
+        missionTicks.forEach((s, k) => s.classList.toggle('active', k === idx));
+        if (missionTel) missionTel.textContent = STAGE_TAGS[idx];
+      },
+    },
+  });
+  buildMission(world, gsap, missionTl);
+  missionST = missionTl.scrollTrigger;
+} else {
+  // no WebGL: let the stage cards read as a plain vertical list
+  document.getElementById('mission').classList.add('no-webgl');
+}
+
+// --- 7. CAPABILITIES ---
 camTween('#capabilities', poses.capabilities);
 revealsIn('#capabilities');
 
-// --- 6. CYCLE ---
-camTween('#cycle', poses.cycle);
-revealsIn('#cycle');
-gsap.set('#cycle-steps span, #cycle-steps i', { opacity: 0, y: 14 });
-gsap.to('#cycle-steps span, #cycle-steps i', {
-  opacity: 1, y: 0, duration: 0.5, stagger: 0.08, ease: 'power2.out',
-  scrollTrigger: { trigger: '#cycle-steps', start: 'top 85%' },
-});
-
-// --- 7. MANIFESTO ---
+// --- 8. MANIFESTO ---
 camTween('#manifesto', poses.manifesto);
 revealsIn('#manifesto');
 
 // ============================================================
-// GLOBAL PHASE DRIVER — plain scroll listener, immune to
-// ScrollTrigger measurement staleness
+// GLOBAL PHASE DRIVER — plain scroll listener + phase keyframes
+// derived from the real section layout, so the story beats land:
+// sunset in THE PROBLEM, night across THE STACK, sunrise at THE
+// CYCLE, full daylight for the whole MISSION.
 // ============================================================
 const railFill = document.getElementById('rail-fill');
 const railDot = document.getElementById('rail-dot');
@@ -249,11 +280,49 @@ const tlPhase = document.getElementById('tl-phase');
 const tlTemp = document.getElementById('tl-temp');
 const tlSun = document.getElementById('tl-sun');
 
+let bands = { duskFrom: 0.1, nightFrom: 0.2, dawnFrom: 0.42, dayFrom: 0.52 };
+
+function recomputePhaseKeys() {
+  if (!world) return;
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  if (max <= 0) return;
+  const fr = (px) => Math.min(1, Math.max(0, px / max));
+  const top = (sel) => {
+    const el = document.querySelector(sel);
+    return el ? el.getBoundingClientRect().top + window.scrollY : 0;
+  };
+  const problemTop = fr(top('#problem'));
+  const thesisTop = fr(top('#thesis'));
+  const stackStart = fr(stackTl.scrollTrigger ? stackTl.scrollTrigger.start : top('#stack'));
+  const stackEnd = fr(stackTl.scrollTrigger ? stackTl.scrollTrigger.end : top('#cycle'));
+  const missionStart = fr(missionST ? missionST.start : top('#mission'));
+  const cycleMid = (stackEnd + missionStart) / 2;
+  world.setPhaseKeys([
+    [0, 42],
+    [problemTop * 0.9, 30],
+    [(problemTop + thesisTop) / 2, 10],
+    [thesisTop, 2],
+    [thesisTop + (stackStart - thesisTop) * 0.6, -14],
+    [stackEnd, -16],
+    [cycleMid, -5],
+    [missionStart, 7],
+    [Math.min(1, missionStart + 0.08), 20],
+    [1, 45],
+  ]);
+  bands = {
+    duskFrom: (problemTop + thesisTop) / 2,
+    nightFrom: thesisTop + (stackStart - thesisTop) * 0.6,
+    dawnFrom: cycleMid,
+    dayFrom: missionStart + 0.01,
+  };
+  updatePhase();
+}
+
 function phaseName(p) {
-  if (p < 0.18) return ['LUNAR DAY', 'day'];
-  if (p < 0.33) return ['SUNSET', 'dusk'];
-  if (p < 0.74) return ['LUNAR NIGHT', 'night'];
-  if (p < 0.91) return ['DAWN', 'dawn'];
+  if (p < bands.duskFrom) return ['LUNAR DAY', 'day'];
+  if (p < bands.nightFrom) return ['SUNSET', 'dusk'];
+  if (p < bands.dawnFrom) return ['LUNAR NIGHT', 'night'];
+  if (p < bands.dayFrom) return ['DAWN', 'dawn'];
   return ['LUNAR DAY', 'day'];
 }
 
@@ -271,7 +340,7 @@ function updatePhase() {
   const [name, key] = phaseName(p);
   railLabels.forEach((s) => s.classList.toggle('active', s.dataset.phase === key));
   tlPhase.textContent = name;
-  const temp = Math.round(-180 + daylight * 286); // −180 → +106
+  const temp = Math.round(-180 + daylight * 286);
   tlTemp.textContent = `SURFACE ${temp > 0 ? '+' : ''}${temp}°C`;
   tlSun.textContent = el >= 0 ? `SUN EL ${Math.round(el)}°` : `SUN −${Math.abs(Math.round(el))}° BELOW HORIZON`;
 }
@@ -279,6 +348,9 @@ window.addEventListener('scroll', updatePhase, { passive: true });
 window.addEventListener('resize', updatePhase);
 updatePhase();
 if (import.meta.env.DEV) window.__updatePhase = updatePhase;
+
+ScrollTrigger.addEventListener('refresh', recomputePhaseKeys);
+recomputePhaseKeys();
 
 // re-measure once everything (fonts, layout) settles
 window.addEventListener('load', () => ScrollTrigger.refresh());

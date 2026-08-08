@@ -35,8 +35,9 @@
     <nav class="nav-links">
       <a href="#problem">THE PROBLEM</a>
       <a href="#stack">THE STACK</a>
+      <a href="#mission">THE MISSION</a>
       <a href="#capabilities">CAPABILITIES</a>
-      <a href="#manifesto">MISSION</a>
+      <a href="#manifesto">MANIFESTO</a>
     </nav>
     <a class="nav-cta" href="#manifesto">FLY A PAYLOAD</a>
   </header>
@@ -141,7 +142,7 @@
     <section id="stack">
       <div id="stack-pin">
         <div class="stack-head">
-          <div class="kicker">// INTRODUCING</div>
+          <div class="kicker">// INTRODUCING LEAP</div>
           <h2 class="stack-title">THE COSMOCHUTE STACK</h2>
           <div class="stack-sub">ONE INTEGRATED LUNAR ARCHITECTURE. LIT UP IN THE DARK.</div>
         </div>
@@ -152,34 +153,115 @@
             <h3 class="sp-name">EPOC</h3>
             <div class="sp-role">MODULAR REUSABLE ROVER</div>
             <p class="sp-desc">The workhorse. Autonomous navigation with real-time hazard avoidance,
-            interchangeable payload bays, and a robotic arm for payload swaps, sampling and regolith
-            work. Engineered as a persistent asset that improves with every deployment cycle.</p>
-            <ul class="sp-tags"><li>AUTONOMOUS</li><li>MODULAR BAYS</li><li>ROBOTIC ARM</li><li>240 KG</li></ul>
+            a robotic arm for payload swaps and regolith work, and a belly chamber that docks one
+            8U Cartridge at a time. Engineered as a persistent asset that improves with every
+            deployment cycle.</p>
+            <ul class="sp-tags"><li>AUTONOMOUS</li><li>BELLY CHAMBER</li><li>ROBOTIC ARM</li><li>REUSABLE</li></ul>
           </article>
 
           <article class="stack-panel" data-model="oasys">
             <div class="sp-index">SYS 02 / 03</div>
-            <h3 class="sp-name">OASYS</h3>
-            <div class="sp-role">PAYLOAD CARRIER TRAILER</div>
-            <p class="sp-desc">The haulage. A towable trailer with standardized 8U bays — 64U+ of
-            capacity, up to 120 kg of customer payloads — kept safe in transit and deployed
-            sequentially, anywhere EPOC can drive.</p>
-            <ul class="sp-tags"><li>64U+ BAYS</li><li>120 KG</li><li>SEQUENTIAL DEPLOY</li><li>ROVER DOCKING</li></ul>
+            <h3 class="sp-name">OASys</h3>
+            <div class="sp-role">PAYLOAD RELOADING &amp; STORAGE TRAILER</div>
+            <p class="sp-desc">The magazine. A towable trailer that keeps every customer Cartridge
+            safe from integration to deployment — up to 120 kg of payloads, reloaded onto EPOC
+            one mission at a time, anywhere the rover can drive.</p>
+            <ul class="sp-tags"><li>8 × 8U SLOTS</li><li>120 KG</li><li>SEQUENTIAL RELOAD</li><li>ROVER-TOWED</li></ul>
           </article>
 
           <article class="stack-panel" data-model="cartridge">
             <div class="sp-index">SYS 03 / 03</div>
             <h3 class="sp-name">CARTRIDGE</h3>
-            <div class="sp-role">PAYLOAD SURVIVAL SYSTEM</div>
-            <p class="sp-desc">The lifeboat. Passive thermal control, power and data through the
-            354-hour lunar night. Your experiment stays warm, powered, and talking to Earth —
-            while everything else on the surface goes dark.</p>
-            <ul class="sp-tags"><li>PASSIVE THERMAL</li><li>300 W</li><li>EARTH DOWNLINK</li><li>NIGHT-RATED</li></ul>
+            <div class="sp-role">8U PAYLOAD SURVIVAL SYSTEM</div>
+            <p class="sp-desc">The lifeboat. A protected 8U enclosure — 400 × 200 × 100 mm — with a
+            top hatch for regolith entry, a front horizon window for imagers, and a wide bottom
+            window for spectrometers. Powered, connected, and talking to Earth.</p>
+            <ul class="sp-tags"><li>400×200×100 MM</li><li>REGOLITH HATCH</li><li>HORIZON WINDOW</li><li>SURFACE WINDOW</li></ul>
           </article>
         </div>
 
         <div class="stack-progress" aria-hidden="true">
-          <span class="stp" data-i="0">EPOC</span><span class="stp" data-i="1">OASYS</span><span class="stp" data-i="2">CARTRIDGE</span>
+          <span class="stp" data-i="0">EPOC</span><span class="stp" data-i="1">OASys</span><span class="stp" data-i="2">CARTRIDGE</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 6 · THE CYCLE (SUNRISE — SEGUE INTO THE MISSION) ============ -->
+    <section id="cycle" class="section">
+      <div class="content-block content-center">
+        <div class="kicker reveal">// 354 HOURS LATER</div>
+        <h2 class="display display-big reveal-lines">
+          <span>THEN THE SUN RISES.</span>
+          <span class="accent">AND WE GO BACK TO WORK.</span>
+        </h2>
+        <p class="lede lede-center reveal">Not a mission. A campaign. This is what a LEAP
+        deployment looks like — end to end, exactly as it happens on the surface.
+        Keep scrolling to fly it.</p>
+      </div>
+    </section>
+
+    <!-- ============ 7 · THE MISSION (FULL DAYLIGHT, PINNED) ============ -->
+    <section id="mission">
+      <div id="mission-pin">
+        <div class="mission-head">
+          <div class="kicker">// CONCEPT OF OPERATIONS</div>
+          <h2 class="mission-title">ONE CAMPAIGN. END TO END.</h2>
+          <div class="mission-tel-wrap"><span class="tl-dot"></span><span id="mission-tel">E1O1 // INTEGRATION</span></div>
+        </div>
+
+        <div class="mission-stages">
+          <article class="m-stage" data-stage="0">
+            <div class="ms-index">PHASE 01 / 08</div>
+            <h3 class="ms-name">INTEGRATION &amp; LAUNCH</h3>
+            <p class="ms-desc">Customer payloads are assembled into OASys, cartridge by cartridge.
+            OASys and EPOC are integrated with the launcher — and the campaign leaves Earth.</p>
+          </article>
+          <article class="m-stage" data-stage="1">
+            <div class="ms-index">PHASE 02 / 08</div>
+            <h3 class="ms-name">LANDING</h3>
+            <p class="ms-desc">The lander flies the stack down to the surface. Touchdown.
+            Commissioning begins within minutes.</p>
+          </article>
+          <article class="m-stage" data-stage="2">
+            <div class="ms-index">PHASE 03 / 08 — E1O1</div>
+            <h3 class="ms-name">LEAVING THE FOOTPRINT</h3>
+            <p class="ms-desc">EPOC and OASys leave the lander footprint together, rolling for
+            their first mission destination.</p>
+          </article>
+          <article class="m-stage" data-stage="3">
+            <div class="ms-index">PHASE 04 / 08</div>
+            <h3 class="ms-name">FIRST MISSION</h3>
+            <p class="ms-desc">EPOC takes the first payload onto its belly, locks OASys down at a
+            safe place — and advances alone into terrain no trailer should ever see.</p>
+          </article>
+          <article class="m-stage" data-stage="4">
+            <div class="ms-index">PHASE 05 / 08</div>
+            <h3 class="ms-name">END OF FIRST MISSION</h3>
+            <p class="ms-desc">Operations complete — the data already home via the relay orbiter —
+            EPOC finds OASys again, returns the spent cartridge, and swaps to the next payload.</p>
+          </article>
+          <article class="m-stage" data-stage="5">
+            <div class="ms-index">PHASE 06 / 08</div>
+            <h3 class="ms-name">NEXT MISSIONS</h3>
+            <p class="ms-desc">Park. Deploy. Operate. Return. EPOC cycles through the manifest,
+            payload after payload, until the magazine runs dry.</p>
+          </article>
+          <article class="m-stage" data-stage="6">
+            <div class="ms-index">PHASE 07 / 08</div>
+            <h3 class="ms-name">TRAILER HEAVEN</h3>
+            <p class="ms-desc">All missions served, EPOC tows OASys to rest in Trailer Heaven —
+            a full campaign, delivered.</p>
+          </article>
+          <article class="m-stage" data-stage="7">
+            <div class="ms-index">PHASE 08 / 08 — E1O2</div>
+            <h3 class="ms-name">THE NEXT ADVENTURE</h3>
+            <p class="ms-desc">And EPOC leaves for the next landing site. Somewhere over the
+            horizon, OASys 2 is waiting with a whole new set of payloads.</p>
+          </article>
+        </div>
+
+        <div id="mission-rail" aria-hidden="true">
+          <span class="mt">LAUNCH</span><span class="mt">LAND</span><span class="mt">EGRESS</span><span class="mt">MISSION 1</span><span class="mt">SWAP</span><span class="mt">MISSIONS</span><span class="mt">HEAVEN</span><span class="mt">E1O2</span>
         </div>
       </div>
     </section>
@@ -196,8 +278,9 @@
           <div class="cap reveal">
             <div class="cap-num">C-01</div>
             <h3>SURVIVE THE NIGHT</h3>
-            <p>Passive thermal architecture holds payloads between −40°C and +85°C through
-            fourteen days of darkness. Multi-layer insulation, radiative rejection, no drama.</p>
+            <p>Controlled thermal environment: −20°C to +70°C operational, −40°C to +85°C
+            survival — through fourteen days of darkness. Multi-layer insulation, radiative
+            rejection, no drama.</p>
           </div>
           <div class="cap reveal">
             <div class="cap-num">C-02</div>
@@ -208,44 +291,29 @@
           <div class="cap reveal">
             <div class="cap-num">C-03</div>
             <h3>STAY CONNECTED</h3>
-            <p>Continuous power and Earth downlink. Your experiment data lands in your inbox,
-            not in the regolith. 300 W peak to your payload.</p>
+            <p>Regulated 5, 12 and 28 V buses — up to 504 W to your payload — with CAN, UART and
+            SpaceWire data links. Your results come home through the relay orbiter, delivered
+            to your inbox, not the regolith.</p>
           </div>
           <div class="cap reveal">
             <div class="cap-num">C-04</div>
             <h3>TOUCH THE SURFACE</h3>
-            <p>Robotic regolith access, sample collection and handling, and hosting for optical
-            science. Direct interaction with the Moon, on demand.</p>
+            <p>Top hatch for regolith entry. Front window for horizon imagers. Wide bottom window
+            for spectrometers. Direct, protected interaction with the Moon — on demand.</p>
           </div>
         </div>
       </div>
-    </section>
-
-    <!-- ============ 6 · THE CYCLE (SUNRISE) ============ -->
-    <section id="cycle" class="section">
-      <div class="content-block content-center">
-        <div class="kicker reveal">// 354 HOURS LATER</div>
-        <h2 class="display display-big reveal-lines">
-          <span>THEN THE SUN RISES.</span>
-          <span class="accent">AND WE GO BACK TO WORK.</span>
-        </h2>
-        <p class="lede lede-center reveal">Not a mission. A cycle. Land once, operate for years —
-        infrastructure that compounds instead of hardware that expires.</p>
-        <div class="cycle-steps" id="cycle-steps">
-          <span>LAND</span><i>→</i><span>DEPLOY</span><i>→</i><span>OPERATE</span><i>→</i><span>ENDURE</span><i>→</i><span>WAKE</span><i>→</i><span class="accent">REDEPLOY</span>
-        </div>
-      </div>
       <div class="specs-strip reveal" id="specs">
-        <div class="spec"><b>240<em> KG</em></b><span>EPOC ROVER, DRY</span></div>
-        <div class="spec"><b>130<em> KG</em></b><span>OASYS TRAILER</span></div>
-        <div class="spec"><b>120<em> KG</em></b><span>TOTAL PAYLOAD</span></div>
-        <div class="spec"><b>64U<em>+</em></b><span>PAYLOAD CAPACITY</span></div>
-        <div class="spec"><b>−40 / +85<em> °C</em></b><span>PAYLOAD ENVIRONMENT</span></div>
-        <div class="spec"><b>300<em> W</em></b><span>PEAK PAYLOAD POWER</span></div>
+        <div class="spec"><b>8U</b><span>STANDARD CARTRIDGE</span></div>
+        <div class="spec"><b>10<em> KG</em></b><span>PER 8U CARTRIDGE</span></div>
+        <div class="spec"><b>120<em> KG</em></b><span>CUSTOM CARTRIDGE, MAX</span></div>
+        <div class="spec"><b>5/12/28<em> V</em></b><span>POWER BUSES, TO 504 W</span></div>
+        <div class="spec"><b>−20 / +70<em> °C</em></b><span>OPERATIONAL ENVELOPE</span></div>
+        <div class="spec"><b>55<em> %</em></b><span>CHEAPER PER MISSION</span></div>
       </div>
     </section>
 
-    <!-- ============ 7 · MANIFESTO / CTA (DAY AGAIN) ============ -->
+    <!-- ============ 8 · MANIFESTO / CTA (DAY AGAIN) ============ -->
     <section id="manifesto" class="section">
       <div class="content-block content-center">
         <h2 class="display display-huge reveal-lines">
@@ -278,6 +346,7 @@
     <div class="foot-meta">
       <span>© 2026 COSMOCHUTE</span>
       <span>EARTH · MOON · ONWARD</span>
+      <span class="foot-credit">EARTH &amp; STAR IMAGERY: SOLAR SYSTEM SCOPE (CC BY 4.0)</span>
     </div>
   </footer>
 

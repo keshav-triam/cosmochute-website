@@ -325,15 +325,55 @@ main { position: relative; z-index: 10; }
 }
 .cap p { margin-top: 1rem; font-size: 0.85rem; line-height: 1.6; color: var(--ink-dim); }
 
-/* ============ CYCLE ============ */
-.cycle-steps {
-  margin-top: 3rem; display: flex; justify-content: center; align-items: center;
-  gap: clamp(0.5rem, 1.6vw, 1.2rem); flex-wrap: wrap;
-  font-family: var(--font-hud); font-size: clamp(0.62rem, 1.4vw, 0.85rem);
-  letter-spacing: 0.22em; color: var(--ink);
+/* ============ MISSION (pinned end-to-end campaign) ============ */
+#mission { position: relative; }
+#mission-pin {
+  height: 100vh; display: flex; flex-direction: column;
+  padding: clamp(4.5rem, 10vh, 6rem) clamp(1.4rem, 6vw, 6rem) clamp(2.2rem, 6vh, 3.4rem);
+  position: relative; overflow: hidden;
 }
-.cycle-steps i { color: var(--ink-faint); font-style: normal; }
-.cycle-steps .accent { color: var(--accent); }
+.mission-head { display: flex; align-items: baseline; gap: 2rem; flex-wrap: wrap; }
+.mission-title {
+  font-size: clamp(1.4rem, 3vw, 2.3rem); font-weight: 700; letter-spacing: 0.02em;
+}
+.mission-tel-wrap {
+  font-family: var(--font-hud); font-size: 0.62rem; letter-spacing: 0.26em;
+  color: var(--cyan); margin-left: auto;
+}
+.mission-stages { position: relative; flex: 1; }
+.m-stage {
+  position: absolute; bottom: 0; left: 0; max-width: 460px;
+  opacity: 0; visibility: hidden;
+  background: rgba(4, 5, 9, 0.55); backdrop-filter: blur(4px);
+  border-left: 2px solid var(--accent);
+  padding: 1.3rem 1.5rem 1.4rem;
+}
+.ms-index {
+  font-family: var(--font-hud); font-size: 0.58rem; letter-spacing: 0.3em;
+  color: var(--cyan); margin-bottom: 0.8rem;
+}
+.ms-name {
+  font-family: var(--font-hud); font-size: clamp(1.15rem, 2.4vw, 1.7rem);
+  font-weight: 600; letter-spacing: 0.08em; color: var(--ink);
+}
+.ms-desc { margin-top: 0.8rem; color: var(--ink-dim); font-size: 0.88rem; line-height: 1.6; }
+#mission-rail {
+  margin-top: 1.6rem; display: flex; gap: clamp(0.8rem, 2.4vw, 2rem); flex-wrap: wrap;
+  font-family: var(--font-hud); font-size: 0.56rem; letter-spacing: 0.22em;
+  color: var(--ink-faint);
+}
+.mt { position: relative; padding-top: 0.65rem; }
+.mt::before {
+  content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 1px;
+  background: var(--line);
+}
+.mt.active { color: var(--accent); }
+.mt.active::before { background: var(--accent); }
+/* no-WebGL fallback: cards become a readable vertical list */
+#mission.no-webgl #mission-pin { height: auto; }
+#mission.no-webgl .m-stage {
+  position: static; opacity: 1; visibility: visible; margin-bottom: 1.2rem;
+}
 
 .specs-strip {
   margin: 4.5rem auto 0; max-width: 1200px; width: 100%;
@@ -389,6 +429,7 @@ main { position: relative; z-index: 10; }
   font-family: var(--font-hud); font-size: 0.55rem; letter-spacing: 0.2em;
   color: var(--ink-faint);
 }
+.foot-credit { font-size: 0.48rem; opacity: 0.7; }
 
 /* ============ REVEAL PRIMITIVES ============ */
 /* initial hidden states only apply once JS has booted (body.js) —
