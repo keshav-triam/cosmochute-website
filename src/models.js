@@ -35,7 +35,7 @@ export const mats = {
   pcb: new THREE.MeshStandardMaterial({ color: 0x1e3a2a, metalness: 0.2, roughness: 0.6 }),
   capSilver: new THREE.MeshStandardMaterial({ color: 0xc8cbd2, metalness: 0.9, roughness: 0.25 }),
 };
-const edgeMat = new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.4 });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x4a4b50, transparent: true, opacity: 0.3 });
 
 export function makeGlowMat(color, base = 0x111111) {
   return new THREE.MeshStandardMaterial({
@@ -328,9 +328,10 @@ export function buildEpoc() {
   upper.add(fore);
   armRoot.add(upper);
   g.add(armRoot);
-  // stowed: folded back over the deck
-  armRoot.rotation.z = -2.5;
-  fore.rotation.z = 2.4;
+  // stowed: compact Z-fold held above the deck (elbow stays clear of
+  // the chassis — the long arm would otherwise poke through it)
+  armRoot.rotation.z = -1.35;
+  fore.rotation.z = 2.6;
 
   // --- lights ---
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 10), makeGlowMat(ACCENT));
@@ -435,11 +436,12 @@ export function buildOasys() {
   // tow bar (pivots up when unhitched)
   const towRoot = new THREE.Group();
   towRoot.position.set(1.28, 0.55, 0);
-  const bar = box(0.95, 0.06, 0.06, mats.gold);
-  bar.position.x = 0.48;
+  const bar = box(1.17, 0.06, 0.06, mats.gold);
+  bar.position.x = 0.585;
   towRoot.add(bar);
-  const eye = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.02, 8, 14), mats.gold);
-  eye.position.x = 0.98;
+  const eye = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.022, 8, 14), mats.gold);
+  eye.rotation.x = Math.PI / 2;
+  eye.position.x = 1.2;
   towRoot.add(eye);
   g.add(towRoot);
 

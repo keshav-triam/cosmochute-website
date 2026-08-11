@@ -90,41 +90,91 @@ export function buildMission(world, gsap, tl) {
   ]);
 
   // ---------------- wheel-track ribbons ----------------
-  const trackMat = new THREE.MeshBasicMaterial({
-    color: 0x55524b, transparent: true, opacity: 0.5,
+  // Twin tread strips at the real wheel gauge — grouser imprints and
+  // pushed-up berms via a bump-mapped tread texture, lit by the sun so
+  // the relief reads as displaced soil, not a painted fade.
+  function makeTreadTexture() {
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#3e3a33';
+    ctx.fillRect(0, 0, 64, 64);
+    for (let y = 0; y < 64; y += 8) {
+      ctx.fillStyle = 'rgba(16,14,12,0.9)';   // grouser trench
+      ctx.fillRect(0, y, 64, 3);
+      ctx.fillStyle = 'rgba(150,140,124,0.55)'; // pushed ridge
+      ctx.fillRect(0, y + 3, 64, 2);
+    }
+    ctx.fillStyle = 'rgba(160,150,134,0.6)';   // side berms
+    ctx.fillRect(0, 0, 6, 64);
+    ctx.fillRect(58, 0, 6, 64);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+  const treadTex = makeTreadTexture();
+  const trackMat = new THREE.MeshStandardMaterial({
+    map: treadTex, bumpMap: treadTex, bumpScale: 3,
+    roughness: 1, metalness: 0,
+    transparent: true, opacity: 0.95,
     polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false,
   });
-  function buildRibbon(curve, width = 0.95, surfaceFn = null) {
+  const TRACK_GAUGE = 0.78, TRACK_W = 0.34;
+  function buildRibbon(curve, widthIgnored = 0.95, surfaceFn = null, maskFn = null) {
     const N = 130;
-    const posArr = new Float32Array(N * 6 * 3);
+    const meshes = [];
     const pt = new THREE.Vector3(), tan = new THREE.Vector3();
     const side = new THREE.Vector3();
-    const prevL = new THREE.Vector3(), prevR = new THREE.Vector3();
-    for (let i = 0; i <= N; i++) {
-      const p = i / N;
-      curve.getPointAt(p, pt);
-      curve.getTangentAt(p, tan);
-      side.set(-tan.z, 0, tan.x).normalize().multiplyScalar(width / 2);
-      const y = (surfaceFn || terrainHeight)(pt.x, pt.z) + 0.04;
-      const L = new THREE.Vector3(pt.x - side.x, y, pt.z - side.z);
-      const R = new THREE.Vector3(pt.x + side.x, y, pt.z + side.z);
-      if (i > 0) {
-        const o = (i - 1) * 18;
-        posArr.set([prevL.x, prevL.y, prevL.z, prevR.x, prevR.y, prevR.z, L.x, L.y, L.z], o);
-        posArr.set([prevR.x, prevR.y, prevR.z, R.x, R.y, R.z, L.x, L.y, L.z], o + 9);
+    for (const lane of [-TRACK_GAUGE, TRACK_GAUGE]) {
+      const posArr = new Float32Array(N * 6 * 3);
+      const uvArr = new Float32Array(N * 6 * 2);
+      const prevL = new THREE.Vector3(), prevR = new THREE.Vector3();
+      let prevV = 0, dist = 0;
+      const prevPt = new THREE.Vector3();
+      for (let i = 0; i <= N; i++) {
+        const p = i / N;
+        curve.getPointAt(p, pt);
+        curve.getTangentAt(p, tan);
+        side.set(-tan.z, 0, tan.x).normalize();
+        if (i > 0) dist += pt.distanceTo(prevPt);
+        prevPt.copy(pt);
+        const masked = maskFn && !maskFn(pt.x, pt.z);
+        const y = (surfaceFn || terrainHeight)(pt.x, pt.z) + 0.045;
+        const c0 = lane / 2 - (masked ? 0 : TRACK_W / 2);
+        const c1 = lane / 2 + (masked ? 0 : TRACK_W / 2);
+        const L = new THREE.Vector3(pt.x + side.x * c0, y, pt.z + side.z * c0);
+        const R = new THREE.Vector3(pt.x + side.x * c1, y, pt.z + side.z * c1);
+        const v = dist / 0.55; // tread repeat along the path
+        if (i > 0) {
+          const o = (i - 1) * 18, ou = (i - 1) * 12;
+          posArr.set([prevL.x, prevL.y, prevL.z, prevR.x, prevR.y, prevR.z, L.x, L.y, L.z], o);
+          posArr.set([prevR.x, prevR.y, prevR.z, R.x, R.y, R.z, L.x, L.y, L.z], o + 9);
+          uvArr.set([0, prevV, 1, prevV, 0, v], ou);
+          uvArr.set([1, prevV, 1, v, 0, v], ou + 6);
+        }
+        prevL.copy(L); prevR.copy(R); prevV = v;
       }
-      prevL.copy(L); prevR.copy(R);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(uvArr, 2));
+      g.computeVertexNormals();
+      const mesh = new THREE.Mesh(g, trackMat);
+      mesh.frustumCulled = false;
+      mesh.receiveShadow = true;
+      g.setDrawRange(0, 0);
+      scene.add(mesh);
+      meshes.push(mesh);
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
-    const mesh = new THREE.Mesh(g, trackMat);
-    mesh.frustumCulled = false;
-    g.setDrawRange(0, 0);
-    scene.add(mesh);
-    return { mesh, N };
+    return { meshes, N };
   }
+  const egressOnSoil = (x, z) => {
+    const u = (x - SITES.lander.x) * Math.cos(LANDER_HEADING)
+            - (z - SITES.lander.z) * Math.sin(LANDER_HEADING);
+    return u > RAMP_END_U - 0.1;
+  };
   const ribbons = {
-    egress: buildRibbon(egress, 1.0, egressSurfaceY),
+    egress: buildRibbon(egress, 1.0, egressSurfaceY, egressOnSoil),
     m1: buildRibbon(m1), m1r: buildRibbon(m1r),
     m2: buildRibbon(m2), m2r: buildRibbon(m2r),
     tow: buildRibbon(towCurve), exit: buildRibbon(exitCurve),
@@ -149,13 +199,51 @@ export function buildMission(world, gsap, tl) {
     const hL = sf(pt.x + sx * e, pt.z + sz * e);
     const hR = sf(pt.x - sx * e, pt.z - sz * e);
     obj.rotation.x = Math.atan2(hR - hL, 2 * e) * 0.55;
+    suspend(obj, sf);
   }
   function spinWheels(m, dist) {
     for (const w of m.userData.wheels) w.rotation.z = -dist / m.userData.wheelR;
   }
 
+  // independent suspension: each wheel drops/rises to touch the surface
+  // under its own contact point, decoupled from the body attitude
+  const suspE = new THREE.Euler();
+  const suspM = new THREE.Matrix4();
+  const suspV = new THREE.Vector3();
+  function suspend(m, sf) {
+    const ud = m.userData;
+    if (!ud.wheels) return;
+    suspE.set(m.rotation.x, m.rotation.y, m.rotation.z, 'XYZ');
+    suspM.makeRotationFromEuler(suspE);
+    const bY = suspV.set(0, 1, 0).applyMatrix4(suspM).y || 1;
+    for (const wgrp of ud.wheels) {
+      suspV.set(wgrp.position.x, 0, wgrp.position.z).applyMatrix4(suspM);
+      const wx = m.position.x + suspV.x;
+      const wz = m.position.z + suspV.z;
+      const aY = suspV.y;
+      let yl = (sf(wx, wz) + ud.wheelR - m.position.y - aY) / bY;
+      yl = THREE.MathUtils.clamp(yl, ud.wheelR - 0.22, ud.wheelR + 0.22);
+      wgrp.position.y = yl;
+    }
+  }
+
   // cumulative wheel distance baseline per segment, for continuous spin
   let epocDistBase = 0, oasysDistBase = 0;
+  const hitchBall = new THREE.Vector3();
+  // aim the tow bar at EPOC's hitch ball; blend 0 = raised, 1 = latched
+  function aimTowBar(blend) {
+    epoc.updateMatrixWorld();
+    oasys.updateMatrixWorld();
+    hitchBall.set(-1.12, 0.62, 0);
+    epoc.localToWorld(hitchBall);
+    oasys.worldToLocal(hitchBall);
+    const hdx = hitchBall.x - 1.28, hdy = hitchBall.y - 0.55, hdz = hitchBall.z;
+    const tr = oasys.userData.towRoot;
+    const aimY = Math.atan2(-hdz, hdx);
+    const aimZ = Math.atan2(hdy, Math.hypot(hdx, hdz));
+    tr.rotation.y = aimY * blend;
+    tr.rotation.z = 0.85 * (1 - blend) + aimZ * blend;
+  }
 
   // drive segment: EPOC (optionally towing OASys) follows a curve.
   // pStart lets a towed segment begin with OASys exactly at curve start.
@@ -174,9 +262,12 @@ export function buildMission(world, gsap, tl) {
           const po = Math.max(0, proxy.p - hitchFrac);
           place(oasys, curve, po, opts);
           spinWheels(oasys, oBase + po * len);
+          // keep the coupling latched through bends and slopes
+          aimTowBar(1);
         }
         if (ribbon) {
-          ribbon.mesh.geometry.setDrawRange(0, Math.floor(proxy.p * ribbon.N) * 6);
+          const dr = Math.floor(proxy.p * ribbon.N) * 6;
+          for (const mm of ribbon.meshes) mm.geometry.setDrawRange(0, dr);
         }
         if (opts.followTarget) {
           curve.getPointAt(Math.min(1, proxy.p + 0.04), pt);
@@ -240,10 +331,23 @@ export function buildMission(world, gsap, tl) {
     return [yaw, branches[0].s, branches[0].e];
   }
   // poses: [root yaw, shoulder, elbow]
-  const POSE_STOW = [0, -2.5, 2.4];
+  const POSE_STOW = [0, -1.35, 2.6];
+  // big yaw changes route through a raised elbow-up posture so the arm
+  // sweeps OVER the rover instead of slicing through mast and deck
+  let armLastYaw = 0;
   function armPose(at, dur, pose) {
-    tl.to(arm.root.rotation, { y: pose[0], z: pose[1], duration: dur, ease: 'power2.inOut' }, at);
-    tl.to(arm.fore.rotation, { z: pose[2], duration: dur, ease: 'power2.inOut' }, at + 0.02);
+    const dyaw = Math.abs(pose[0] - armLastYaw);
+    if (dyaw > 0.7) {
+      tl.to(arm.root.rotation, { z: -0.3, duration: dur * 0.35, ease: 'power2.inOut' }, at);
+      tl.to(arm.fore.rotation, { z: 0.4, duration: dur * 0.35, ease: 'power2.inOut' }, at);
+      tl.to(arm.root.rotation, { y: pose[0], duration: dur * 0.4, ease: 'power1.inOut' }, at + dur * 0.3);
+      tl.to(arm.root.rotation, { z: pose[1], duration: dur * 0.42, ease: 'power2.inOut' }, at + dur * 0.56);
+      tl.to(arm.fore.rotation, { z: pose[2], duration: dur * 0.42, ease: 'power2.inOut' }, at + dur * 0.58);
+    } else {
+      tl.to(arm.root.rotation, { y: pose[0], z: pose[1], duration: dur, ease: 'power2.inOut' }, at);
+      tl.to(arm.fore.rotation, { z: pose[2], duration: dur, ease: 'power2.inOut' }, at + 0.02);
+    }
+    armLastYaw = pose[0];
   }
 
   // exact pick geometry at basecamp, computed from the parked poses
@@ -393,7 +497,7 @@ export function buildMission(world, gsap, tl) {
   carry(cartridges[CART_A], 'wrist', 'belly', T.s4 + 0.79, 0.07);
   armPose(T.s4 + 0.87, 0.12, POSE_STOW);
   // unhitch: tow bar up
-  tl.to(tow.rotation, { z: 0.85, duration: 0.1 }, T.s4 + 0.88);
+  tl.to(tow.rotation, { z: 0.85, y: 0, duration: 0.1 }, T.s4 + 0.88);
   // solo traverse into the rough zone
   noteArrival(egress);
   turn(T.s4 + 0.9, 0.08, m1);
@@ -472,10 +576,15 @@ export function buildMission(world, gsap, tl) {
   tl.set(cartridges[CART_B].userData, { dimmed: true, immediateRender: false }, T.s7 + 0.66);
   armPose(T.s7 + 0.67, 0.08, HOVER_B);
   armPose(T.s7 + 0.77, 0.1, POSE_STOW);
-  // hitch up and take OASys to its rest
-  tl.to(tow.rotation, { z: 0, duration: 0.1 }, T.s7 + 0.88);
-  cam(T.s7 + 0.98, 0.4, { x: -19, y: 3.0, z: 17 });
-  turn(T.s7 + 1.0, 0.08, towCurve, HITCH / towCurve.getLength());
+  // EPOC lines up on the departure heading FIRST, then the tow bar
+  // drops onto the hitch ball in its final geometry and settles home
+  cam(T.s7 + 0.9, 0.4, { x: -19, y: 3.0, z: 17 });
+  turn(T.s7 + 0.86, 0.08, towCurve, HITCH / towCurve.getLength());
+  const towLatch = { p: 0 };
+  tl.to(towLatch, {
+    p: 1, duration: 0.2, ease: 'power2.inOut', immediateRender: false,
+    onUpdate: () => aimTowBar(towLatch.p),
+  }, T.s7 + 0.96);
   drive(T.s7 + 1.1, 0.38, towCurve, ribbons.tow, {
     tow: true, fromHitch: true, followTarget: true,
   });
@@ -486,7 +595,7 @@ export function buildMission(world, gsap, tl) {
   // S8 — E1O2: THE NEXT ADVENTURE
   // ============================================================
   card(7, T.s8 + 0.06, null); // stays until the pin releases
-  tl.to(tow.rotation, { z: 0.85, duration: 0.1 }, T.s8 + 0.02);
+  tl.to(tow.rotation, { z: 0.85, y: 0, duration: 0.1 }, T.s8 + 0.02);
   cam(T.s8 + 0.02, 0.35, {
     x: TH.x - 4.5, y: 1.7, z: TH.z + 6.5,
     tx: TH.x + 8, ty: 1.2, tz: TH.z - 4,
