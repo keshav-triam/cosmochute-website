@@ -26,7 +26,8 @@ export const mats = {
   wheelWire: new THREE.MeshStandardMaterial({ color: 0x8b8e95, metalness: 0.9, roughness: 0.35, wireframe: true }),
   mli: new THREE.MeshStandardMaterial({
     map: T.mli, normalMap: T.mliN, normalScale: new THREE.Vector2(1.2, 1.2),
-    color: 0xffffff, metalness: 0.85, roughness: 0.32,
+    roughnessMap: T.mliRough, roughness: 1,
+    color: 0xffffff, metalness: 0.85,
   }),
   gold: new THREE.MeshStandardMaterial({ color: 0xcf9331, metalness: 0.8, roughness: 0.3 }),
   solar: new THREE.MeshStandardMaterial({ map: T.solar, color: 0xffffff, metalness: 0.55, roughness: 0.3 }),
@@ -299,29 +300,30 @@ export function buildEpoc() {
   armRoot.position.set(-0.85, 1.22, 0.45);
   const shoulderHub = cyl(0.09, 0.09, 0.14, 12, mats.gold);
   armRoot.add(shoulderHub);
+  const ARM_L1 = 1.05, ARM_L2 = 1.0;
   const upper = new THREE.Group();
-  const upperSeg = box(0.06, 0.72, 0.06, mats.alu);
-  upperSeg.position.y = 0.36;
+  const upperSeg = box(0.065, ARM_L1, 0.065, mats.alu);
+  upperSeg.position.y = ARM_L1 / 2;
   upper.add(upperSeg);
   const elbowHub = cyl(0.07, 0.07, 0.12, 10, mats.gold);
   elbowHub.rotation.x = Math.PI / 2;
-  elbowHub.position.y = 0.72;
+  elbowHub.position.y = ARM_L1;
   upper.add(elbowHub);
   const fore = new THREE.Group();
-  fore.position.y = 0.72;
-  const foreSeg = box(0.05, 0.62, 0.05, mats.alu);
-  foreSeg.position.y = 0.31;
+  fore.position.y = ARM_L1;
+  const foreSeg = box(0.055, ARM_L2 - 0.18, 0.055, mats.alu);
+  foreSeg.position.y = (ARM_L2 - 0.18) / 2;
   fore.add(foreSeg);
   const wrist = box(0.11, 0.1, 0.09, mats.dark);
-  wrist.position.y = 0.64;
+  wrist.position.y = ARM_L2 - 0.14;
   fore.add(wrist);
   for (const s of [-1, 1]) {
-    const finger = box(0.02, 0.12, 0.03, mats.alu);
-    finger.position.set(s * 0.035, 0.74, 0);
+    const finger = box(0.02, 0.14, 0.03, mats.alu);
+    finger.position.set(s * 0.035, ARM_L2 - 0.05, 0);
     fore.add(finger);
   }
   const wristTip = new THREE.Object3D();
-  wristTip.position.y = 0.8;
+  wristTip.position.y = ARM_L2;
   fore.add(wristTip);
   upper.add(fore);
   armRoot.add(upper);
@@ -354,7 +356,7 @@ export function buildEpoc() {
   markShadows(g);
   g.userData = {
     glows, lamp, wheels, wheelR,
-    arm: { root: armRoot, upper, fore, wristTip },
+    arm: { root: armRoot, upper, fore, wristTip, lengths: { l1: ARM_L1, l2: ARM_L2 } },
     bellyAnchor, dishTip,
   };
   return g;
@@ -535,15 +537,45 @@ export function buildLander() {
   bellLip.position.y = 0.15;
   g.add(bellLip);
 
-  // descent plume: additive cone, lit only while the engine burns
-  const plumeMat = new THREE.MeshBasicMaterial({
-    color: 0xffd9a0, transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
-  });
-  const plume = new THREE.Mesh(new THREE.ConeGeometry(0.72, 3.8, 16, 1, true), plumeMat);
-  plume.rotation.x = Math.PI;
-  plume.position.y = -1.75;
-  g.add(plume);
+  // descent plume: layered vacuum plume — bright core, hot sheath, and a
+  // wide faint expansion haze (vacuum plumes flare far wider than at sea
+  // level). Apex anchored at the nozzle exit; scene.js drives opacity,
+  // flicker, and clamps the length so it never stabs through the surface.
+  const plumeGrp = new THREE.Group();
+  plumeGrp.position.y = 0.16;
+  const plumeMats = [];
+  const plumeLayer = (r, len, baseOp, color) => {
+    const geo = new THREE.ConeGeometry(r, len, 18, 1, true);
+    geo.translate(0, -len / 2, 0); // apex at origin, cone opens downward
+    const m = new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+      side: THREE.DoubleSide, fog: false,
+    });
+    m.userData.baseOp = baseOp;
+    plumeMats.push(m);
+    plumeGrp.add(new THREE.Mesh(geo, m));
+  };
+  plumeLayer(0.3, 2.6, 1.0, 0xfff4da);   // core
+  plumeLayer(0.72, 3.2, 0.38, 0xffc27a); // sheath
+  plumeLayer(1.55, 3.0, 0.14, 0x8fa8ff); // expansion haze
+  const glowCanvas = document.createElement('canvas');
+  glowCanvas.width = glowCanvas.height = 64;
+  const gctx = glowCanvas.getContext('2d');
+  const grad = gctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.4)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  gctx.fillStyle = grad;
+  gctx.fillRect(0, 0, 64, 64);
+  const nozzleGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(glowCanvas), color: 0xffe9c8,
+    transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+    depthWrite: false, fog: false,
+  }));
+  nozzleGlow.scale.setScalar(2.8);
+  plumeGrp.add(nozzleGlow);
+  g.add(plumeGrp);
 
   // --- 4 legs: primary strut + V secondaries + honeycomb pads ---
   for (let i = 0; i < 4; i++) {
@@ -646,8 +678,12 @@ export function buildLander() {
   g.add(engineGlow);
 
   markShadows(g);
-  plume.castShadow = plume.receiveShadow = false; // additive gas, no shadow
-  g.userData = { glows, lamp: new THREE.PointLight(0, 0, 0), ramp: rampRoot, engineGlow, plume: plumeMat, deckY: DECK_Y };
+  plumeGrp.traverse((o) => { o.castShadow = o.receiveShadow = false; });
+  g.userData = {
+    glows, lamp: new THREE.PointLight(0, 0, 0), ramp: rampRoot, engineGlow,
+    plume: { grp: plumeGrp, mats: plumeMats, glow: nozzleGlow, state: { on: 0 }, len: 3.2 },
+    deckY: DECK_Y,
+  };
   g.userData.lamp.intensity = 0; // interface parity with other machines
   g.add(g.userData.lamp);
   return g;

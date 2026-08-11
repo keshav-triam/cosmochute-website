@@ -101,15 +101,16 @@ h -= h.min(); h /= h.max()
 # per-pixel salt-and-pepper grain like real close-up regolith
 macro = spectral_noise(N, 2.4, 5)
 grain = rng.normal(0, 1, (N, N)) * 0.05 + spectral_noise(N, 0.25, 7) * 0.10
-g = 0.40 + h * 0.30 + (macro - 0.5) * 0.14 + grain \
-    - np.clip(crater_shadow, 0, 0.5) * 0.35 + pebble_mask * 0.12
-g = np.clip(g, 0.12, 0.98)
+# true lunar soil is DARK (albedo ~0.08-0.12); keep it moody, let the sun work
+g = 0.30 + h * 0.24 + (macro - 0.5) * 0.11 + grain \
+    - np.clip(crater_shadow, 0, 0.5) * 0.30 + pebble_mask * 0.10
+g = np.clip(g, 0.08, 0.85)
 warm = spectral_noise(N, 2.2, 6)
 alb = np.stack([
-    g * (202 + warm * 12), g * (198 + warm * 6), g * (190 - warm * 8),
+    g * (196 + warm * 10), g * (193 + warm * 5), g * (187 - warm * 7),
 ], axis=-1)
 save_rgb(np.clip(alb, 0, 255).astype(np.uint8), "regolith_albedo.jpg")
-save_rgb(normal_from_height(h, 7.5), "regolith_normal.jpg", 92)
+save_rgb(normal_from_height(h, 8.5), "regolith_normal.jpg", 92)
 
 # ============================================================
 # 2. ROCK — fractured basalt
@@ -122,8 +123,8 @@ frac = spectral_noise(M, 2.0, 12)
 ridge = 1 - np.abs(frac - 0.5) * 2
 rh -= np.where(ridge > 0.86, (ridge - 0.86) * 2.2, 0)
 rh -= rh.min(); rh /= rh.max()
-rg = 0.30 + rh * 0.42
-rock_alb = tint(rg, (198, 192, 184))
+rg = 0.22 + rh * 0.34
+rock_alb = tint(rg, (172, 166, 158))
 save_rgb(rock_alb, "rock_albedo.jpg")
 save_rgb(normal_from_height(rh, 6.0), "rock_normal.jpg", 92)
 
@@ -150,6 +151,9 @@ mli_alb = np.stack([
 ], axis=-1).astype(np.uint8)
 save_rgb(mli_alb, "mli_albedo.jpg")
 save_rgb(normal_from_height(mh, 9.0), "mli_normal.jpg", 92)
+# roughness: crinkle facets are specular, crease lines scatter
+mrough = np.clip(0.52 - mh * 0.3 + crease * 0.4, 0.18, 0.9)
+save_rgb(tint(mrough, (255, 255, 255)), "mli_rough.jpg")
 
 # ============================================================
 # 4. BRUSHED ALUMINIUM

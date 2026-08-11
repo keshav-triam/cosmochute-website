@@ -26,6 +26,7 @@ export const T = {
   rockN: tex('/textures/rock_normal.jpg', { srgb: false }),
   mli: tex('/textures/mli_albedo.jpg'),
   mliN: tex('/textures/mli_normal.jpg', { srgb: false }),
+  mliRough: tex('/textures/mli_rough.jpg', { srgb: false }),
   alu: tex('/textures/alu_albedo.jpg'),
   paint: tex('/textures/paint_albedo.jpg', { repeat: 2 }),
   solar: tex('/textures/solar_albedo.jpg'),

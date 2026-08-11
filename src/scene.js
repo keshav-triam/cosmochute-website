@@ -101,6 +101,18 @@ export function createWorld(canvas) {
   scene.background = new THREE.Color(0x030408);
   scene.fog = new THREE.FogExp2(0x05060a, 0.0055);
 
+  // subtle environment reflections for the metals, generated from the
+  // real sky panorama (mostly dark, with the galactic band as a streak)
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  new THREE.TextureLoader().load('/textures/stars_milky_way.jpg', (t) => {
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    t.colorSpace = THREE.SRGBColorSpace;
+    scene.environment = pmrem.fromEquirectangular(t).texture;
+    scene.environmentIntensity = 0.5;
+    t.dispose();
+    pmrem.dispose();
+  });
+
   const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1200);
 
   // ---------------- lights ----------------
@@ -149,14 +161,14 @@ export function createWorld(canvas) {
   // photoreal regolith: tiled baked albedo + normal detail over the
   // displaced geometry; vertex colors carry the macro patchiness
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
-  const TERRAIN_REPEAT = 44;
+  const TERRAIN_REPEAT = 58;
   for (const t of [TEX.regolith, TEX.regolithN]) {
     t.repeat.set(TERRAIN_REPEAT, TERRAIN_REPEAT);
     t.anisotropy = Math.min(8, maxAniso);
   }
   const terrainMat = new THREE.MeshStandardMaterial({
     map: TEX.regolith, normalMap: TEX.regolithN,
-    normalScale: new THREE.Vector2(0.85, 0.85),
+    normalScale: new THREE.Vector2(1.05, 1.05),
     vertexColors: true, roughness: 1, metalness: 0,
   });
   const terrain = new THREE.Mesh(terrainGeo, terrainMat);
@@ -215,10 +227,25 @@ export function createWorld(canvas) {
     const a = hash(i, 7) * Math.PI * 2;
     const r = 10 + Math.pow(hash(i, 13), 0.7) * 170;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    // keep the driving lanes clear
+    // keep sites AND every driving corridor clear (approximated by the
+    // straight lanes between mission waypoints, wide enough to cover the
+    // actual curved paths)
     const nearSite = [SITES.lander, SITES.basecamp, SITES.deploy1, SITES.deploy2, SITES.heaven]
       .some((s) => Math.hypot(x - s.x, z - s.z) < 4.5);
     if (nearSite) continue;
+    const lanes = [
+      [SITES.lander, SITES.basecamp], [SITES.basecamp, SITES.deploy1],
+      [SITES.basecamp, SITES.deploy2], [SITES.basecamp, SITES.heaven],
+      [SITES.heaven, SITES.exit],
+    ];
+    let onLane = false;
+    for (const [la, lb] of lanes) {
+      const abx = lb.x - la.x, abz = lb.z - la.z;
+      const tt = Math.max(0, Math.min(1, ((x - la.x) * abx + (z - la.z) * abz) / (abx * abx + abz * abz)));
+      const ddx = x - (la.x + abx * tt), ddz = z - (la.z + abz * tt);
+      if (ddx * ddx + ddz * ddz < 3.4 * 3.4) { onLane = true; break; }
+    }
+    if (onLane) continue;
     let s = 0.14 + Math.pow(hash(i, 29), 2.2) * 2.0;
     // extra boulders in the rough zone
     const inRough = x > 4 && x < 17 && z > -20 && z < -5;
@@ -349,7 +376,7 @@ export function createWorld(canvas) {
       epoc.userData.bellyAnchor.getWorldPosition(out);
     } else { // 'wrist' — hang just below the gripper fingers
       epoc.userData.arm.wristTip.getWorldPosition(out);
-      out.y -= 0.16;
+      out.y -= 0.1;
     }
     return out;
   }
@@ -422,6 +449,13 @@ export function createWorld(canvas) {
   ]);
 
   // landing dust: expanding ring sprite at touchdown
+  const splash = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeGlowTexture(), color: 0xd8c49e, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+  }));
+  splash.scale.set(4, 1.2, 1);
+  scene.add(splash);
+
   const dust = new THREE.Sprite(new THREE.SpriteMaterial({
     map: glowTex, color: 0xa89f8e, transparent: true, opacity: 0,
     depthWrite: false,
@@ -479,12 +513,12 @@ export function createWorld(canvas) {
     const horizonCol = p < 0.5 ? sunsetColor : dawnColor;
     tmpColor.copy(dayColor).lerp(horizonCol, horizon * 0.9);
     sun.color.copy(tmpColor);
-    sun.intensity = 3.4 * daylight;
+    sun.intensity = 4.1 * daylight;
     sunSprite.material.opacity = daylight * (0.55 + horizon * 0.45);
     sunSprite.material.color.copy(tmpColor);
 
     fillSky.intensity = 0.06 + daylight * 0.32;
-    earthshine.intensity = 0.06 + night * 0.22;
+    earthshine.intensity = 0.08 + night * 0.3;
     starMat.opacity = 0.25 + night * 0.75;
     skyDome.material.opacity = 0.14 + night * 0.86;
 
@@ -503,7 +537,7 @@ export function createWorld(canvas) {
     cartDisplay.userData.window.emissiveIntensity = glowI;
 
     scene.fog.density = 0.0045 + night * 0.002;
-    renderer.toneMappingExposure = 1.0 + daylight * 0.1;
+    renderer.toneMappingExposure = 1.02 + daylight * 0.16;
 
     return { el, daylight, night };
   }
@@ -557,6 +591,29 @@ export function createWorld(canvas) {
       bp.setXYZ(1, orbiter.position.x, orbiter.position.y, orbiter.position.z);
       bp.needsUpdate = true;
       beam.computeLineDistances();
+    }
+
+    // descent plume: throttle comes from the mission timeline; flicker,
+    // length clamping (never pierce the surface) and the ground splash
+    // are cosmetic and derived live from the lander's height
+    const pl = lander.userData.plume;
+    if (pl.state.on > 0.001) {
+      const on = pl.state.on;
+      const flick = 1 + Math.sin(t * 41) * 0.05 + Math.sin(t * 97) * 0.03;
+      const nozzleY = lander.position.y + 0.16;
+      const clearance = Math.max(0.25, nozzleY - 0.04);
+      pl.grp.scale.set(flick, Math.min(1, clearance / pl.len), flick);
+      const throttle = 0.82 + Math.sin(t * 53) * 0.1 + Math.sin(t * 131) * 0.08;
+      for (const m of pl.mats) m.opacity = m.userData.baseOp * on * throttle;
+      pl.glow.material.opacity = 0.95 * on * throttle;
+      const near = THREE.MathUtils.clamp(1 - (nozzleY - 0.3) / 7, 0, 1);
+      splash.material.opacity = 0.55 * on * near;
+      splash.scale.set(3 + near * 10, 0.8 + near * 2.4, 1);
+      splash.position.set(lander.position.x, 0.3, lander.position.z);
+    } else if (pl.mats[0].opacity > 0) {
+      for (const m of pl.mats) m.opacity = 0;
+      pl.glow.material.opacity = 0;
+      splash.material.opacity = 0;
     }
 
     // beacon breathing at night; lampBoost is a mission-timeline channel
