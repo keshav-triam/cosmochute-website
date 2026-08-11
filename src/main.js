@@ -240,7 +240,7 @@ if (world) {
       trigger: '#mission-pin',
       start: 'top top',
       // function-based pixel end — see stack pin note
-      end: () => `+=${Math.round(window.innerHeight * 8.5)}`,
+      end: () => `+=${Math.round(window.innerHeight * 10)}`,
       pin: true,
       scrub: 0.6,
       onUpdate: (self) => {

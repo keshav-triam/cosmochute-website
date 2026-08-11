@@ -12,6 +12,10 @@
 //   TRAILER HEAVEN (-11, 12) gentle rise
 // ============================================================
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
   buildEpoc, buildOasys, buildCartridge, buildLander, buildOrbiter,
   ACCENT, CYAN, OASYS_SLOTS,
@@ -115,11 +119,24 @@ export function createWorld(canvas) {
 
   const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1200);
 
+  // cinematic pipeline: multisampled HDR buffer -> subtle bloom -> ACES
+  // output. Bloom lifts the sun, the plume, and the night-time glows into
+  // photographic territory without washing out the day scenes.
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(
+    window.innerWidth, window.innerHeight,
+    { samples: 4, type: THREE.HalfFloatType },
+  ));
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight), 0.32, 0.55, 0.85);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+
   // ---------------- lights ----------------
   const sun = new THREE.DirectionalLight(0xfff3e0, 3.2);
   sun.position.set(40, 50, 20);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(window.innerWidth > 900 ? 4096 : 2048, window.innerWidth > 900 ? 4096 : 2048);
   sun.shadow.camera.near = 180;
   sun.shadow.camera.far = 460;
   sun.shadow.camera.left = -55; sun.shadow.camera.right = 55;
@@ -623,13 +640,14 @@ export function createWorld(canvas) {
     oasys.userData.lamp.intensity = state.night * 4.0 * pulse + (oasys.userData.lampBoost || 0);
 
     glueCartridges();
-    renderer.render(scene, camera);
+    composer.render();
   }
 
   function resize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
   }
   window.addEventListener('resize', resize);
 
