@@ -101,11 +101,17 @@ export function buildMission(world, gsap, tl) {
   });
   const TRACK_GAUGE = 0.78;
   const UVS = 58 / 460; // identical world->uv scale as the terrain map
-  // cross-section: [lateral offset, height offset]; middle two ride the floor
+  // cross-section template: [lateral offset, height offset] — floor is as
+  // wide as the wheel itself (0.30 vs 0.26 wheel + squish); heights get
+  // per-ring randomisation below, because real churned soil is never neat
   const RUT_PROF = [
-    [-0.3, 0.0], [-0.21, 0.055], [-0.115, 0.012],
-    [0.115, 0.012], [0.21, 0.055], [0.3, 0.0],
+    [-0.30, 0.0], [-0.225, 0.055], [-0.15, 0.012],
+    [0.15, 0.012], [0.225, 0.055], [0.30, 0.0],
   ];
+  const rh = (aa, bb) => {
+    const s = Math.sin(aa * 127.1 + bb * 311.7) * 43758.5453;
+    return s - Math.floor(s);
+  };
   function buildRibbon(curve, widthIgnored = 0.95, surfaceFn = null, maskFn = null) {
     const N = 130;
     const meshes = [];
@@ -125,12 +131,27 @@ export function buildMission(world, gsap, tl) {
         prevPt.copy(pt);
         const masked = maskFn && !maskFn(pt.x, pt.z);
         const y0 = (surfaceFn || terrainHeight)(pt.x, pt.z);
-        // grouser bites: the floor rises and falls along the run
-        const bite = (Math.floor(dist / 0.42) % 2) ? 0.0 : 0.03;
+        // irregular grouser bites: depth, spacing and duty all vary
+        const cell = Math.floor(dist / 0.45);
+        const duty = 0.4 + rh(cell, lane * 3) * 0.3;
+        const biteOn = (dist / 0.45) % 1 < duty;
+        const bite = biteOn ? 0.008 + rh(cell, lane) * 0.034 : 0;
+        // churned-soil jitter: berms slump unevenly, the floor undulates,
+        // and the whole rut wanders a little off its line
+        const wander = Math.sin(dist * 0.85 + lane * 2.7) * 0.035
+                     + (rh(cell, lane * 17) - 0.5) * 0.02;
+        const bermL = 0.05 + (rh(i, lane * 13) - 0.5) * 0.038;
+        const bermR = 0.05 + (rh(i + 991, lane * 13) - 0.5) * 0.038;
+        const floorJ = (rh(i, lane * 7) - 0.5) * 0.014;
         const ring = RUT_PROF.map(([off, hh], k) => {
-          const lat = masked ? lane / 2 : lane / 2 + off;
+          const lat = masked ? lane / 2 : lane / 2 + off + wander;
           const isFloor = k === 2 || k === 3;
-          const h = masked ? 0.01 : hh + (isFloor ? bite : 0);
+          let h;
+          if (masked) h = 0.01;
+          else if (isFloor) h = 0.012 + floorJ + bite;
+          else if (k === 1) h = bermL;
+          else if (k === 4) h = bermR;
+          else h = hh + (rh(i + k * 31, lane) - 0.5) * 0.012;
           return [pt.x + side.x * lat, y0 + 0.015 + h, pt.z + side.z * lat];
         });
         if (i > 0 && prevRing) {
