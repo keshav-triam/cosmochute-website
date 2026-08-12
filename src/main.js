@@ -129,8 +129,11 @@ const poses = {
   problem:     { x: -5.5, y: 1.7, z: 8.6,  tx: -0.5, ty: 0.8,  tz: 0 },
   thesis:      { x: 2.5,  y: 3.8, z: 12.5, tx: 0,    ty: 1.6,  tz: -6 },
   cycle:       { x: -3.5, y: 2.0, z: 9.5,  tx: 1.5,  ty: 1.2,  tz: -3 },
-  capabilities:{ x: 0,    y: 2.8, z: 9.5,  tx: 0,    ty: 1.0,  tz: 0 },
-  manifesto:   { x: 0,    y: 2.5, z: 11.5, tx: 0,    ty: 1.1,  tz: 0 },
+  // the journey home from Trailer Heaven happens in two legs so the
+  // camera never leaps: first a high overlook back across the worked
+  // field (ruts, craters, basecamp), then a low settle near home
+  capabilities:{ x: 13,   y: 4.6, z: 14,   tx: 0,    ty: 0.6,  tz: 0 },
+  manifesto:   { x: 3,    y: 2.8, z: 11.5, tx: -1,   ty: 0.9,  tz: -1.5 },
 };
 
 const cs = world ? world.camState : {};

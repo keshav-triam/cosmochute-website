@@ -495,7 +495,18 @@ export function buildMission(world, gsap, tl) {
   // S1 — INTEGRATION & LAUNCH
   // ============================================================
   card(0, T.s1 + 0.08, T.s2 - 0.14);
-  cam(T.s1, 0.4, { x: -2, y: 2.2, z: 16, tx: -120, ty: 150, tz: -320 });
+  // before the sky pan, push the lookAt point far out along the CURRENT
+  // gaze — identical framing on screen, but the sweep to Earth then runs
+  // at even angular speed (lerping a near lookAt to a far one whips the
+  // gaze in the first few frames)
+  tl.call(() => {
+    const dx = cs.tx - cs.x, dy = cs.ty - cs.y, dz = cs.tz - cs.z;
+    const L = Math.hypot(dx, dy, dz) || 1;
+    cs.tx = cs.x + (dx / L) * 400;
+    cs.ty = cs.y + (dy / L) * 400;
+    cs.tz = cs.z + (dz / L) * 400;
+  }, [], T.s1 + 0.004);
+  cam(T.s1 + 0.01, 0.42, { x: -2, y: 2.2, z: 16, tx: -120, ty: 150, tz: -320 });
   // while the camera is skyward, quietly stage the actors:
   tl.set(lander.position, { x: SITES.lander.x, y: landerY + 55, z: SITES.lander.z, immediateRender: false }, T.s1 + 0.06);
   tl.set(lander.rotation, { y: LANDER_HEADING, immediateRender: false }, T.s1 + 0.06);
@@ -537,11 +548,17 @@ export function buildMission(world, gsap, tl) {
   // S2 — LANDING
   // ============================================================
   card(1, T.s2 + 0.06, T.s3 - 0.14);
-  cam(T.s2, 0.35, { x: -29, y: 3.2, z: 4, tx: SITES.lander.x, ty: 42, tz: SITES.lander.z });
+  // BRIDGE from S1: the travel starts while the streak is still inbound,
+  // gliding toward the landing zone as the gaze descends from Earth to
+  // the stack hovering at stow altitude — the descent-track tween below
+  // then takes ty the rest of the way down, one unbroken move
+  cam(T.s2 - 0.4, 0.68, { x: -29, y: 3.2, z: 4, tx: SITES.lander.x, ty: 58, tz: SITES.lander.z });
   tl.to(cs, { shake: 0.9, duration: 0.3 }, T.s2 + 0.45);
   // the whole stack descends as one: lander + stowed EPOC + stowed OASys —
   // and the camera pans down WITH it, keeping the burn in frame
-  tl.to(cs, { ty: 3, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
+  // inOut, not power2.in: the gaze FRAMES the fall (pad context below)
+  // rather than chasing the lander — chasing whips the tilt at touchdown
+  tl.to(cs, { ty: 3, duration: 0.78, ease: 'power1.inOut' }, T.s2 + 0.05);
   tl.to(lander.position, { y: landerY, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
   tl.to(epoc.position, { y: deckTop, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
   tl.to(oasys.position, { y: deckTop, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
@@ -564,7 +581,8 @@ export function buildMission(world, gsap, tl) {
   // S3 — E1O1: EGRESS
   // ============================================================
   card(2, T.s3 + 0.06, T.s4 - 0.14);
-  cam(T.s3, 0.3, { x: -25, y: 2.3, z: 4, tx: SITES.lander.x + 2, ty: 1.5, tz: SITES.lander.z + 2 });
+  // slow push-in that starts before the boundary — a settle, not a step
+  cam(T.s3 - 0.1, 0.45, { x: -25, y: 2.3, z: 4, tx: SITES.lander.x + 2, ty: 1.5, tz: SITES.lander.z + 2 });
   // launch latches swing open, releasing the convoy…
   lander.userData.clamps.forEach((cl, i) => {
     tl.to(cl.grp.rotation, { x: cl.openRot, duration: 0.14, ease: 'back.out(1.6)' }, T.s3 + 0.02 + i * 0.05);
@@ -582,7 +600,9 @@ export function buildMission(world, gsap, tl) {
   // S4 — FIRST MISSION
   // ============================================================
   card(3, T.s4 + 0.06, T.s5 - 0.14);
-  cam(T.s4, 0.3, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
+  // BRIDGE from S3: the camera is already moving in beside the convoy as
+  // it parks — target hands over seamlessly from the drive's followTarget
+  cam(T.s4 - 0.13, 0.5, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
   // work lights on: the pick area is deliberately lit
   tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s4 + 0.02);
   tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s4 + 0.94);
@@ -608,7 +628,8 @@ export function buildMission(world, gsap, tl) {
   // the whole train advances into the rough zone — trailer and all
   noteArrival(egress);
   turn(T.s4 + 0.9, 0.08, m1, HITCH / m1.getLength());
-  cam(T.s4 + 0.97, 0.3, { x: 2.5, y: 3.4, z: -0.5 });
+  // long crane out ahead of the departing convoy — travels WITH the drive
+  cam(T.s4 + 0.85, 0.6, { x: 2.5, y: 3.4, z: -0.5 });
   drive(T.s4 + 1.0, 0.36, m1, ribbons.m1, { tow: true, fromHitch: true, followTarget: true });
   // operate: belly payload live, downlink to the relay orbiter
   lidOpen(T.s5 - 0.16, 0.08);
@@ -626,7 +647,8 @@ export function buildMission(world, gsap, tl) {
   // on the hook behind; nobody drives anywhere
   noteArrival(m1);
   tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s5 + 0.14);
-  cam(T.s5 + 0.12, 0.3, { x: 5, y: 2.4, z: -7, tx: D1.x, ty: 1.0, tz: D1.z });
+  // BRIDGE from S4: glide begins as the convoy is still rolling to a stop
+  cam(T.s5 - 0.05, 0.5, { x: 5, y: 2.4, z: -7, tx: D1.x, ty: 1.0, tz: D1.z });
   // lid opens; the arm lifts the spent cartridge out — attached all the way…
   lidOpen(T.s5 + 0.16, 0.1);
   armPose(T.s5 + 0.2, 0.1, BOX_HOVER);
@@ -660,8 +682,10 @@ export function buildMission(world, gsap, tl) {
   armPose(T.s6 + 0.4, 0.07, BOX_HOVER);
   lidClose(T.s6 + 0.48, 0.08);
   armPose(T.s6 + 0.48, 0.1, POSE_STOW);
-  // …and the convoy rolls ONWARD — never back — to crater site two
-  cam(T.s6 + 0.56, 0.3, { x: 9, y: 8.5, z: 9, tx: 13, ty: 0, tz: -3 });
+  // …and the convoy rolls ONWARD — never back — to crater site two.
+  // The crane up to the aerial starts early and rises through the drive
+  // start, so the ascent and the departure read as one move
+  cam(T.s6 + 0.5, 0.55, { x: 9, y: 8.5, z: 9, tx: 13, ty: 0, tz: -3 });
   noteArrival(m1);
   turn(T.s6 + 0.6, 0.06, leg2, HITCH / leg2.getLength());
   drive(T.s6 + 0.68, 0.54, leg2, ribbons.leg2, { tow: true, fromHitch: true, followTarget: true });
@@ -681,7 +705,9 @@ export function buildMission(world, gsap, tl) {
   noteArrival(leg2);
   tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s7 + 0.04);
   tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s7 + 0.82);
-  cam(T.s7 + 0.02, 0.25, { x: 7.5, y: 2.4, z: 11, tx: D2.x, ty: 1.0, tz: D2.z });
+  // BRIDGE from S6: swoop down from the aerial while the site-two beam
+  // is still firing — the descent IS the transition
+  cam(T.s7 - 0.12, 0.5, { x: 7.5, y: 2.4, z: 11, tx: D2.x, ty: 1.0, tz: D2.z });
   // the last cartridge comes out of the bay and is racked home
   lidOpen(T.s7 + 0.06, 0.1);
   armPose(T.s7 + 0.1, 0.1, BOX_HOVER);
@@ -709,7 +735,9 @@ export function buildMission(world, gsap, tl) {
   // ============================================================
   card(7, T.s8 + 0.06, null); // stays until the pin releases
   tl.to(tow.rotation, { z: 0.85, y: 0, duration: 0.1 }, T.s8 + 0.02);
-  cam(T.s8 + 0.02, 0.35, {
+  // BRIDGE from S7: drift around the rise while the convoy parks, so the
+  // unhitch happens mid-glide instead of after a cut
+  cam(T.s8 - 0.14, 0.55, {
     x: TH.x - 6, y: 4.5, z: TH.z + 10,
     tx: TH.x + 10, ty: 0.8, tz: TH.z - 4,
   });
