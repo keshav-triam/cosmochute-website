@@ -550,9 +550,12 @@ export function buildMission(world, gsap, tl) {
   card(1, T.s2 + 0.06, T.s3 - 0.14);
   // BRIDGE from S1: the travel starts while the streak is still inbound,
   // gliding toward the landing zone as the gaze descends from Earth to
-  // the stack hovering at stow altitude — the descent-track tween below
-  // then takes ty the rest of the way down, one unbroken move
-  cam(T.s2 - 0.4, 0.68, { x: -29, y: 3.2, z: 4, tx: SITES.lander.x, ty: 58, tz: SITES.lander.z });
+  // the stack hovering at stow altitude. ty runs on its OWN tween that
+  // ends before the descent-track tween begins — the two must never
+  // overlap: a timeline playing backward renders overlapping siblings
+  // in reverse order, so a same-property overlap snaps on reverse scroll
+  cam(T.s2 - 0.4, 0.68, { x: -29, y: 3.2, z: 4, tx: SITES.lander.x, tz: SITES.lander.z });
+  tl.to(cs, { ty: 58, duration: 0.41, ease: 'power1.inOut' }, T.s2 - 0.38);
   tl.to(cs, { shake: 0.9, duration: 0.3 }, T.s2 + 0.45);
   // the whole stack descends as one: lander + stowed EPOC + stowed OASys —
   // and the camera pans down WITH it, keeping the burn in frame
@@ -684,8 +687,10 @@ export function buildMission(world, gsap, tl) {
   armPose(T.s6 + 0.48, 0.1, POSE_STOW);
   // …and the convoy rolls ONWARD — never back — to crater site two.
   // The crane up to the aerial starts early and rises through the drive
-  // start, so the ascent and the departure read as one move
-  cam(T.s6 + 0.5, 0.55, { x: 9, y: 8.5, z: 9, tx: 13, ty: 0, tz: -3 });
+  // start; position ONLY — the gaze belongs to the drive's followTarget
+  // the whole way (an explicit target tween here would overlap the
+  // follow-cam and snap on reverse scroll)
+  cam(T.s6 + 0.5, 0.55, { x: 9, y: 8.5, z: 9 });
   noteArrival(m1);
   turn(T.s6 + 0.6, 0.06, leg2, HITCH / leg2.getLength());
   drive(T.s6 + 0.68, 0.54, leg2, ribbons.leg2, { tow: true, fromHitch: true, followTarget: true });
@@ -735,9 +740,10 @@ export function buildMission(world, gsap, tl) {
   // ============================================================
   card(7, T.s8 + 0.06, null); // stays until the pin releases
   tl.to(tow.rotation, { z: 0.85, y: 0, duration: 0.1 }, T.s8 + 0.02);
-  // BRIDGE from S7: drift around the rise while the convoy parks, so the
-  // unhitch happens mid-glide instead of after a cut
-  cam(T.s8 - 0.14, 0.55, {
+  // BRIDGE from S7: drift around the rise as the convoy parks, so the
+  // unhitch happens mid-glide. Starts just AFTER the tow drive ends —
+  // its target tween must not overlap the drive's followTarget
+  cam(T.s8 - 0.03, 0.44, {
     x: TH.x - 6, y: 4.5, z: TH.z + 10,
     tx: TH.x + 10, ty: 0.8, tz: TH.z - 4,
   });

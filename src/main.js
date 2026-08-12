@@ -129,23 +129,37 @@ const poses = {
   problem:     { x: -5.5, y: 1.7, z: 8.6,  tx: -0.5, ty: 0.8,  tz: 0 },
   thesis:      { x: 2.5,  y: 3.8, z: 12.5, tx: 0,    ty: 1.6,  tz: -6 },
   cycle:       { x: -3.5, y: 2.0, z: 9.5,  tx: 1.5,  ty: 1.2,  tz: -3 },
-  // the journey home from Trailer Heaven happens in two legs so the
-  // camera never leaps: first a high overlook back across the worked
-  // field (ruts, craters, basecamp), then a low settle near home
-  capabilities:{ x: 13,   y: 4.6, z: 14,   tx: 0,    ty: 0.6,  tz: 0 },
+  // last pre-mission leg: the gaze starts lifting toward the dawn sky,
+  // pre-motivating the mission's pan up to Earth
+  presky:      { x: -2.8, y: 2.15, z: 10.2, tx: 1.2, ty: 5,    tz: -3.5 },
+  // the journey home from Trailer Heaven: pull back and rise with the
+  // gaze still on the departing rover, then a long drift that turns
+  // homeward across the worked field, then a low settle by the lander
+  capabilities:{ x: 15.5, y: 5.2, z: 13,   tx: 28,   ty: 0.4,  tz: -3 },
+  fieldDrift:  { x: 7.5,  y: 3.6, z: 12.8, tx: 0,    ty: 0.7,  tz: -0.5 },
   manifesto:   { x: 3,    y: 2.8, z: 11.5, tx: -1,   ty: 0.9,  tz: -1.5 },
 };
 
 const cs = world ? world.camState : {};
 if (world) Object.assign(cs, poses.hero);
 
-function camTween(sectionSel, pose) {
-  if (!world) return;
-  gsap.to(cs, {
-    ...pose, ease: 'none', immediateRender: false,
-    scrollTrigger: { trigger: sectionSel, start: 'top bottom', end: 'top top', scrub: 0.6 },
-  });
+// One continuous scrubbed flight across several sections — each leg's
+// scroll length equals the real layout distance it covers, so poses
+// arrive exactly as their section tops reach the viewport top, but the
+// camera NEVER freezes between sections and no move is squeezed into a
+// single viewport (per-section tweens produced a fly-freeze-fly rhythm
+// that read as random pans and cuts)
+function camJourney(triggerOpts, legs) {
+  if (!world) return null;
+  const tl = gsap.timeline({ scrollTrigger: { scrub: 0.6, ...triggerOpts } });
+  let at = 0;
+  for (const leg of legs) {
+    tl.to(cs, { ...leg.pose, duration: leg.px, ease: 'power1.inOut' }, at);
+    at += leg.px;
+  }
+  return tl;
 }
+const topOf = (sel) => document.querySelector(sel).offsetTop;
 
 function revealsIn(scopeSel) {
   gsap.utils.toArray(`${scopeSel} .reveal`).forEach((el) => {
@@ -171,16 +185,19 @@ function revealsIn(scopeSel) {
   });
 }
 
-// --- 2. PROBLEM ---
-camTween('#problem', poses.problem);
+// --- 2-4. PROBLEM / THESIS / CYCLE: one unbroken camera journey from
+// the hero all the way to the mission pin ---
+const journeyA = camJourney(
+  { trigger: '#hero', start: 'top top', endTrigger: '#mission-pin', end: 'top top' },
+  [
+    { pose: poses.problem, px: topOf('#problem') },
+    { pose: poses.thesis, px: topOf('#thesis') - topOf('#problem') },
+    { pose: poses.cycle, px: topOf('#cycle') - topOf('#thesis') },
+    { pose: poses.presky, px: topOf('#mission') - topOf('#cycle') },
+  ],
+);
 revealsIn('#problem');
-
-// --- 3. THESIS ---
-camTween('#thesis', poses.thesis);
 revealsIn('#thesis');
-
-// --- 4. CYCLE (sunrise — the segue into the mission) ---
-camTween('#cycle', poses.cycle);
 revealsIn('#cycle');
 
 // --- 6. THE MISSION: pinned end-to-end campaign ---
@@ -193,7 +210,15 @@ const STAGE_TAGS = [
 ];
 
 let missionST = null;
+let journeyB = null;
 if (world) {
+  // HANDOFF DISCIPLINE at the pin edges: with scrub smoothing, an
+  // outgoing scrubbed timeline keeps easing (and writing the camera)
+  // for up to ~0.6s after the scroll has moved on — and the moment the
+  // incoming system's tween coverage has a gap, that late tail wins and
+  // SNAPS the camera back (speed-dependent, reads as a random cut).
+  // Each edge crossing therefore jumps the OUTGOING writer's playhead
+  // straight to the endpoint its scrub was already heading to.
   const missionTl = gsap.timeline({
     scrollTrigger: {
       trigger: '#mission-pin',
@@ -202,6 +227,20 @@ if (world) {
       end: () => `+=${Math.round(window.innerHeight * 10)}`,
       pin: true,
       scrub: 0.6,
+      // "finish your ease NOW": progress(1) on the ST's internal scrub
+      // tween jumps it to the endpoint it was already heading to.
+      // (Calling progress() on the TIMELINE instead is wrong — the live
+      // scrub tween keeps playing and rewinds the timeline mid-ease.)
+      // All four edges: the OUTGOING writer's scrub is collapsed the
+      // moment the edge is crossed. Letting it ease out naturally seems
+      // gentler but is worse: it keeps overwriting the camera long past
+      // the edge, then hands back with an unbounded mismatch (huge at
+      // fast scroll). The collapse costs at most one bounded step at
+      // the crossing itself, buried in the scroll motion.
+      onEnter: () => { journeyA?.scrollTrigger.getTween()?.progress(1); },
+      onLeaveBack: () => { missionTl.scrollTrigger.getTween()?.progress(1); },
+      onLeave: () => { missionTl.scrollTrigger.getTween()?.progress(1); },
+      onEnterBack: () => { journeyB?.scrollTrigger.getTween()?.progress(1); },
       onUpdate: (self) => {
         const t = self.progress * MT.end;
         let idx = 0;
@@ -218,12 +257,17 @@ if (world) {
   document.getElementById('mission').classList.add('no-webgl');
 }
 
-// --- 7. CAPABILITIES ---
-camTween('#capabilities', poses.capabilities);
+// --- 7-8. CAPABILITIES / MANIFESTO: the unbroken journey home, picking
+// up the camera exactly where the mission pin releases it ---
+journeyB = camJourney(
+  { trigger: '#capabilities', start: 'top bottom', endTrigger: '#manifesto', end: 'top top' },
+  [
+    { pose: poses.capabilities, px: window.innerHeight },
+    { pose: poses.fieldDrift, px: topOf('#manifesto') - topOf('#capabilities') - window.innerHeight },
+    { pose: poses.manifesto, px: window.innerHeight },
+  ],
+);
 revealsIn('#capabilities');
-
-// --- 8. MANIFESTO ---
-camTween('#manifesto', poses.manifesto);
 revealsIn('#manifesto');
 
 // ============================================================
