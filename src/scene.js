@@ -388,20 +388,6 @@ export function createWorld(canvas) {
   oasys.rotation.y = -0.18;
   scene.add(oasys);
 
-  // display cartridge for the stack showcase (scaled up on a plinth)
-  const cartDisplay = buildCartridge(99);
-  cartDisplay.scale.setScalar(2.6);
-  cartDisplay.position.set(3.1, 0.9, -1.4);
-  cartDisplay.rotation.y = 0.5;
-  scene.add(cartDisplay);
-  const plinth = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.65, 0.75, 0.5, 10),
-    new THREE.MeshStandardMaterial({ color: 0x3a3b40, roughness: 0.8 }),
-  );
-  plinth.position.set(3.1, 0.25, -1.4);
-  plinth.castShadow = plinth.receiveShadow = true;
-  scene.add(plinth);
-
   // magazine cartridges. Scene-level (world space) so they can transfer
   // between OASys slots and EPOC's belly: every frame each cartridge is
   // glued to its current anchor ('slot' | 'belly'), or interpolated
@@ -596,8 +582,6 @@ export function createWorld(canvas) {
       c.userData.led.emissiveIntensity = glowI * dim + boost * 3 + held;
       c.userData.window.emissiveIntensity = glowI * 0.7 * dim + boost * 2 + held * 0.8;
     }
-    cartDisplay.userData.led.emissiveIntensity = glowI;
-    cartDisplay.userData.window.emissiveIntensity = glowI;
 
     scene.fog.density = 0.0026 + night * 0.0013;
     renderer.toneMappingExposure = 1.02 + daylight * 0.16;
@@ -708,7 +692,7 @@ export function createWorld(canvas) {
     renderer, scene, camera, camState, applyPhase, setPhaseKeys, render, state,
     terrainHeight, SITES,
     actors: {
-      epoc, oasys, cartridges, cartDisplay, plinth, lander, orbiter,
+      epoc, oasys, cartridges, lander, orbiter,
       beam, streak, trail, streakCurve, trailPos, trailGeo, dust, scorch,
     },
   };

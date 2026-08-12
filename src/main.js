@@ -128,9 +128,6 @@ const poses = {
   hero:        { x: 0,    y: 2.4, z: 11.0, tx: 0,    ty: 1.0,  tz: 0 },
   problem:     { x: -5.5, y: 1.7, z: 8.6,  tx: -0.5, ty: 0.8,  tz: 0 },
   thesis:      { x: 2.5,  y: 3.8, z: 12.5, tx: 0,    ty: 1.6,  tz: -6 },
-  epoc:        { x: 2.7,  y: 1.5, z: 3.6,  tx: 0,    ty: 0.9,  tz: 0 },
-  oasys:       { x: -1.0, y: 1.5, z: 4.6,  tx: -3.4, ty: 0.8,  tz: 0.9 },
-  cartridge:   { x: 4.9,  y: 1.3, z: 1.4,  tx: 3.1,  ty: 0.95, tz: -1.4 },
   cycle:       { x: -3.5, y: 2.0, z: 9.5,  tx: 1.5,  ty: 1.2,  tz: -3 },
   capabilities:{ x: 0,    y: 2.8, z: 9.5,  tx: 0,    ty: 1.0,  tz: 0 },
   manifesto:   { x: 0,    y: 2.5, z: 11.5, tx: 0,    ty: 1.1,  tz: 0 },
@@ -179,48 +176,7 @@ revealsIn('#problem');
 camTween('#thesis', poses.thesis);
 revealsIn('#thesis');
 
-// --- 4. STACK: approach + pinned 3-system showcase ---
-camTween('#stack', poses.epoc);
-
-const panels = gsap.utils.toArray('.stack-panel');
-const stps = gsap.utils.toArray('.stp');
-gsap.set(panels[0], { opacity: 1, visibility: 'visible' });
-
-const stackTl = gsap.timeline({
-  scrollTrigger: {
-    trigger: '#stack-pin',
-    start: 'top top',
-    // function-based pixel end: a "%" end re-measures against the pin's
-    // own spacer on refresh and compounds without bound
-    end: () => `+=${window.innerHeight * 3}`,
-    pin: true,
-    scrub: 0.6,
-    onUpdate: (self) => {
-      const i = Math.min(2, Math.floor(self.progress * 3));
-      stps.forEach((s, k) => s.classList.toggle('active', k === i));
-    },
-  },
-});
-
-stackTl
-  .to({}, { duration: 0.6 })
-  .to(panels[0], { opacity: 0, y: -24, duration: 0.25 })
-  .set(panels[0], { visibility: 'hidden' })
-  .set(panels[1], { visibility: 'visible', y: 24 })
-  .to(panels[1], { opacity: 1, y: 0, duration: 0.3 }, '-=0.05')
-  .to({}, { duration: 0.6 })
-  .to(panels[1], { opacity: 0, y: -24, duration: 0.25 })
-  .set(panels[1], { visibility: 'hidden' })
-  .set(panels[2], { visibility: 'visible', y: 24 })
-  .to(panels[2], { opacity: 1, y: 0, duration: 0.3 }, '-=0.05')
-  .to({}, { duration: 0.7 });
-
-if (world) {
-  stackTl.to(cs, { ...poses.oasys, duration: 0.55, ease: 'power1.inOut' }, 0.6);
-  stackTl.to(cs, { ...poses.cartridge, duration: 0.55, ease: 'power1.inOut' }, 2.05);
-}
-
-// --- 5. CYCLE (sunrise — the segue into the mission) ---
+// --- 4. CYCLE (sunrise — the segue into the mission) ---
 camTween('#cycle', poses.cycle);
 revealsIn('#cycle');
 
@@ -293,17 +249,16 @@ function recomputePhaseKeys() {
   };
   const problemTop = fr(top('#problem'));
   const thesisTop = fr(top('#thesis'));
-  const stackStart = fr(stackTl.scrollTrigger ? stackTl.scrollTrigger.start : top('#stack'));
-  const stackEnd = fr(stackTl.scrollTrigger ? stackTl.scrollTrigger.end : top('#cycle'));
+  const cycleTop = fr(top('#cycle'));
   const missionStart = fr(missionST ? missionST.start : top('#mission'));
-  const cycleMid = (stackEnd + missionStart) / 2;
+  const cycleMid = (cycleTop + missionStart) / 2;
   world.setPhaseKeys([
     [0, 42],
     [problemTop * 0.9, 30],
     [(problemTop + thesisTop) / 2, 10],
     [thesisTop, 2],
-    [thesisTop + (stackStart - thesisTop) * 0.6, -14],
-    [stackEnd, -16],
+    [thesisTop + (cycleTop - thesisTop) * 0.55, -14],
+    [cycleTop, -13],
     [cycleMid, -5],
     [missionStart, 12],
     [Math.min(1, missionStart + 0.07), 34],
@@ -311,7 +266,7 @@ function recomputePhaseKeys() {
   ]);
   bands = {
     duskFrom: (problemTop + thesisTop) / 2,
-    nightFrom: thesisTop + (stackStart - thesisTop) * 0.6,
+    nightFrom: thesisTop + (cycleTop - thesisTop) * 0.55,
     dawnFrom: cycleMid,
     dayFrom: missionStart + 0.01,
   };

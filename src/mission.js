@@ -27,7 +27,7 @@ export const STAGE_STARTS = [T.s1, T.s2, T.s3, T.s4, T.s5, T.s6, T.s7, T.s8];
 
 export function buildMission(world, gsap, tl) {
   const { actors, camState: cs, terrainHeight, SITES, scene } = world;
-  const { epoc, oasys, cartridges, cartDisplay, plinth, lander, beam, streak, trail, streakCurve, trailPos, trailGeo, dust, scorch } = actors;
+  const { epoc, oasys, cartridges, lander, beam, streak, trail, streakCurve, trailPos, trailGeo, dust, scorch } = actors;
 
   const landerY = terrainHeight(SITES.lander.x, SITES.lander.z);
   const LANDER_HEADING = -0.53; // ramp faces basecamp
@@ -497,8 +497,6 @@ export function buildMission(world, gsap, tl) {
   card(0, T.s1 + 0.08, T.s2 - 0.14);
   cam(T.s1, 0.4, { x: -2, y: 2.2, z: 16, tx: -120, ty: 150, tz: -320 });
   // while the camera is skyward, quietly stage the actors:
-  tl.set(cartDisplay, { visible: false, immediateRender: false }, T.s1 + 0.06);
-  tl.set(plinth, { visible: false, immediateRender: false }, T.s1 + 0.06);
   tl.set(lander.position, { x: SITES.lander.x, y: landerY + 55, z: SITES.lander.z, immediateRender: false }, T.s1 + 0.06);
   tl.set(lander.rotation, { y: LANDER_HEADING, immediateRender: false }, T.s1 + 0.06);
   // stow the convoy on the lander deck — IN THE SKY with the lander;
