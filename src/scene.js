@@ -47,8 +47,8 @@ export const SITES = {
   basecamp: new THREE.Vector3(-4, 0, -1),
   deploy1: new THREE.Vector3(11, 0, -13),
   deploy2: new THREE.Vector3(13, 0, 6),
-  heaven: new THREE.Vector3(-11, 0, 12),
-  exit: new THREE.Vector3(58, 0, -26),
+  heaven: new THREE.Vector3(30, 0, 3),
+  exit: new THREE.Vector3(80, 0, -12),
 };
 
 const craters = [
@@ -56,6 +56,7 @@ const craters = [
   { x: -95, z: 30, r: 40, d: 8 }, { x: 34, z: 62, r: 22, d: 4.5 },
   { x: 110, z: -20, r: 30, d: 6 }, { x: -60, z: -130, r: 45, d: 9 },
   { x: 8, z: -42, r: 14, d: 3 }, { x: -30, z: 46, r: 16, d: 3.2 },
+  { x: 16, z: 9, r: 7, d: 1.7 }, // crater site two — payload 2 deploys on its floor
 ];
 
 // terrain height — the single source of truth, used for geometry
@@ -252,7 +253,7 @@ export function createWorld(canvas) {
     if (nearSite) continue;
     const lanes = [
       [SITES.lander, SITES.basecamp], [SITES.basecamp, SITES.deploy1],
-      [SITES.basecamp, SITES.deploy2], [SITES.basecamp, SITES.heaven],
+      [SITES.deploy1, SITES.deploy2], [SITES.deploy2, SITES.heaven],
       [SITES.heaven, SITES.exit],
     ];
     let onLane = false;
@@ -444,23 +445,11 @@ export function createWorld(canvas) {
         const b = THREE.MathUtils.smoothstep(c.userData.blend, 0, 1);
         anchorPos(c, fromA, anchorA);
         anchorPos(c, toA, anchorB);
-        if (fromA === 'belly' || toA === 'belly') {
-          // belly transfers slide through the chamber's front corridor —
-          // under the hull lip and in, never through the bodywork
-          corridorV.set(0.35, 0.46, 1.3); // side corridor: down past the skirt, then under
-          epoc.updateMatrixWorld();
-          epoc.localToWorld(corridorV);
-          const ib = 1 - b;
-          c.position.set(
-            ib * ib * anchorA.x + 2 * ib * b * corridorV.x + b * b * anchorB.x,
-            ib * ib * anchorA.y + 2 * ib * b * corridorV.y + b * b * anchorB.y,
-            ib * ib * anchorA.z + 2 * ib * b * corridorV.z + b * b * anchorB.z,
-          );
-        } else {
-          c.position.lerpVectors(anchorA, anchorB, b);
-          // arc over the magazine rim
-          c.position.y += Math.sin(b * Math.PI) * 0.35;
-        }
+        c.position.lerpVectors(anchorA, anchorB, b);
+        // small arc: over the magazine rim on slot transfers, a gentle
+        // settle into the top-loading bay on seat transfers
+        const lift = (fromA === 'slot' || toA === 'slot') ? 0.35 : 0.05;
+        c.position.y += Math.sin(b * Math.PI) * lift;
         c.rotation.y = THREE.MathUtils.lerp(anchorYaw(fromA), anchorYaw(toA), b);
       }
     }

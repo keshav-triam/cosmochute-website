@@ -238,37 +238,53 @@ export function buildEpoc() {
   radiator.position.set(-0.45, 1.62, 0);
   g.add(radiator);
   // deck instrument boxes
-  const ib1 = box(0.5, 0.28, 0.5, mats.dark);
-  ib1.position.set(0.45, 1.33, -0.3);
+  const ib1 = box(0.5, 0.28, 0.34, mats.dark);
+  ib1.position.set(0.4, 1.33, -0.42);
   edges(ib1);
   g.add(ib1);
-  const solarTop = box(0.6, 0.03, 0.55, mats.solar);
-  solarTop.position.set(0.45, 1.5, -0.28);
+  const solarTop = box(0.5, 0.03, 0.3, mats.solar);
+  solarTop.position.set(0.4, 1.5, -0.42);
   g.add(solarTop);
   // exposed avionics: capacitors, wire runs, connectors on the deck
-  const deckElec = greebleCluster(11, 0.7, 0.45);
-  deckElec.position.set(0.45, 1.19, 0.32);
+  const deckElec = greebleCluster(11, 0.55, 0.3);
+  deckElec.position.set(0.05, 1.19, 0.45);
   g.add(deckElec);
   const sideElec = greebleCluster(23, 0.7, 0.32);
   sideElec.rotation.x = Math.PI / 2;
   sideElec.position.set(-0.45, 1.4, 0.515);
   g.add(sideElec);
 
-  // --- BELLY CHAMBER — the 8U cartridge dock ---
-  const chamberFrame = new THREE.Group();
-  const cf = box(CART_W + 0.1, CART_H + 0.08, CART_D + 0.1, mats.dark);
-  const cavity = box(CART_W + 0.02, CART_H + 0.02, CART_D + 0.02, mats.black);
-  cavity.position.y = -0.015;
-  chamberFrame.add(cf, cavity);
-  const slitL = box(CART_W + 0.12, 0.02, 0.02, makeGlowMat(CYAN, 0x0a1418));
-  slitL.position.set(0, -CART_H / 2 - 0.03, CART_D / 2 + 0.04);
-  glows.push(slitL.material);
-  chamberFrame.add(slitL);
-  chamberFrame.position.set(0.3, 0.64, 0);
-  g.add(chamberFrame);
-  // belly anchor: where a docked cartridge's centre sits
+  // --- TOP-LOADING PAYLOAD BAY — front deck, lid opens skyward.
+  // The arm lowers the cartridge straight in from above, holding it
+  // the whole way — no free-flying payloads.
+  const bayGrp = new THREE.Group();
+  bayGrp.position.set(0.6, 0, 0.12);
+  const bayOuter = box(0.68, 0.28, 0.46, mats.body);
+  bayOuter.position.y = 1.33;
+  edges(bayOuter);
+  bayGrp.add(bayOuter);
+  const bayCavity = box(0.6, 0.24, 0.38, mats.black);
+  bayCavity.position.y = 1.36;
+  bayGrp.add(bayCavity);
+  const bayStrip = box(0.66, 0.025, 0.02, makeGlowMat(CYAN, 0x0a1418));
+  bayStrip.position.set(0, 1.44, 0.235);
+  glows.push(bayStrip.material);
+  bayGrp.add(bayStrip);
+  // hinged lid (rear edge), swings up and back
+  const lidGrp = new THREE.Group();
+  lidGrp.position.set(-0.34, 1.475, 0);
+  const lidPanel = box(0.68, 0.025, 0.46, mats.body);
+  lidPanel.position.x = 0.34;
+  edges(lidPanel);
+  lidGrp.add(lidPanel);
+  const lidHandle = box(0.08, 0.03, 0.12, mats.gold);
+  lidHandle.position.set(0.58, 0.025, 0);
+  lidGrp.add(lidHandle);
+  bayGrp.add(lidGrp);
+  g.add(bayGrp);
+  // seat anchor: where the docked cartridge's centre sits (inside the bay)
   const bellyAnchor = new THREE.Object3D();
-  bellyAnchor.position.set(0.3, 0.62, 0);
+  bellyAnchor.position.set(0.6, 1.37, 0.12);
   g.add(bellyAnchor);
 
   // --- suspension + 6 mesh wheels ---
@@ -378,6 +394,99 @@ export function buildEpoc() {
   armRoot.rotation.z = 0.15;
   fore.rotation.z = -2.4;
 
+  // --- cameras everywhere: hazcams, navcams, side & rear imagers ---
+  const camPod = (mount = true) => {
+    const pod = new THREE.Group();
+    if (mount) {
+      const bracket = box(0.05, 0.06, 0.05, mats.dark);
+      pod.add(bracket);
+    }
+    const housing = cyl(0.035, 0.042, 0.09, 10, mats.dark);
+    housing.rotation.z = Math.PI / 2;
+    housing.position.x = 0.06;
+    pod.add(housing);
+    const bezel = cyl(0.045, 0.045, 0.015, 10, mats.alu);
+    bezel.rotation.z = Math.PI / 2;
+    bezel.position.x = 0.11;
+    pod.add(bezel);
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.028, 12), makeGlowMat(0x64d8ff, 0x06131c));
+    lens.position.x = 0.12;
+    lens.rotation.y = Math.PI / 2;
+    glows.push(lens.material);
+    pod.add(lens);
+    return pod;
+  };
+  // front hazcams (angled down at the terrain ahead)
+  for (const side of [-1, 1]) {
+    const hc = camPod();
+    hc.position.set(1.04, 0.88, side * 0.34);
+    hc.rotation.z = -0.35;
+    g.add(hc);
+  }
+  // rear hazcams
+  for (const side of [-1, 1]) {
+    const hc = camPod();
+    hc.position.set(-1.04, 0.88, side * 0.34);
+    hc.rotation.y = Math.PI;
+    hc.rotation.z = -0.35;
+    g.add(hc);
+  }
+  // side nav imagers on the deck edges
+  for (const side of [-1, 1]) {
+    const sc = camPod();
+    sc.position.set(0.1, 1.24, side * 0.68);
+    sc.rotation.y = -side * Math.PI / 2;
+    g.add(sc);
+  }
+  // payload-bay monitoring camera on a stalk, looking down into the bay
+  const bayCamStalk = cyl(0.018, 0.018, 0.3, 6, mats.alu);
+  bayCamStalk.position.set(1.0, 1.62, 0.12);
+  g.add(bayCamStalk);
+  const bayCam = camPod(false);
+  bayCam.position.set(1.0, 1.78, 0.12);
+  bayCam.rotation.z = -2.2;
+  g.add(bayCam);
+  // arm-elbow inspection camera
+  const elbowCam = camPod(false);
+  elbowCam.scale.setScalar(0.8);
+  elbowCam.position.set(0, ARM_L1 - 0.08, 0.08);
+  elbowCam.rotation.z = -1.2;
+  upper.add(elbowCam);
+
+  // --- dense electronics: extra boards, boxes and cabling ---
+  const flankElecL = greebleCluster(133, 0.9, 0.3);
+  flankElecL.rotation.x = Math.PI / 2;
+  flankElecL.rotation.z = Math.PI;
+  flankElecL.position.set(-0.1, 1.05, -0.66);
+  g.add(flankElecL);
+  const flankElecR = greebleCluster(157, 0.9, 0.3);
+  flankElecR.rotation.x = -Math.PI / 2;
+  flankElecR.position.set(0.15, 1.05, 0.66);
+  g.add(flankElecR);
+  const rearElec = greebleCluster(171, 0.85, 0.32);
+  rearElec.rotation.z = Math.PI / 2;
+  rearElec.rotation.x = Math.PI / 2;
+  rearElec.position.set(-1.03, 1.0, 0);
+  g.add(rearElec);
+  const noseElec = greebleCluster(191, 0.5, 0.3);
+  noseElec.rotation.z = -Math.PI / 2;
+  noseElec.rotation.x = Math.PI / 2;
+  noseElec.position.set(1.03, 1.02, -0.25);
+  g.add(noseElec);
+  // extra whip antennas + a small GPS-style patch dome
+  for (const [ax, az, ah] of [[-0.75, 0.55, 0.7], [0.15, -0.6, 0.55]]) {
+    const whipA = cyl(0.008, 0.008, ah, 6, mats.dark);
+    whipA.position.set(ax, 1.19 + ah / 2, az);
+    g.add(whipA);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), mats.gold);
+    tip.position.set(ax, 1.19 + ah + 0.01, az);
+    g.add(tip);
+  }
+  const patchDome = new THREE.Mesh(
+    new THREE.SphereGeometry(0.07, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mats.body);
+  patchDome.position.set(-0.2, 1.63, 0.4);
+  g.add(patchDome);
+
   // --- lights ---
   // beacon mast: the light sits ON something, not in mid-air
   const beaconPole = cyl(0.018, 0.022, 0.36, 8, mats.alu);
@@ -410,6 +519,7 @@ export function buildEpoc() {
   g.userData = {
     glows, lamp, wheels, wheelR,
     arm: { root: armRoot, upper, fore, wristTip, lengths: { l1: ARM_L1, l2: ARM_L2 } },
+    payloadLid: lidGrp,
     bellyAnchor, dishTip,
   };
   return g;
@@ -563,6 +673,23 @@ export function buildLander() {
     const hd = box(0.22, 0.09, 1.5, mats.dark);
     hd.position.set(dx, DECK_Y + 0.08, 0);
     g.add(hd);
+  }
+  // launch latches: hooked clamp arms that close over the stowed
+  // vehicles' wheels for the ride down, and swing open for egress
+  const clamps = [];
+  for (const [cx, cz] of [[1.25, 0.95], [1.25, -0.95], [-1.85, 1.0], [-1.85, -1.0]]) {
+    const clampGrp = new THREE.Group();
+    clampGrp.position.set(cx, DECK_Y + 0.05, cz);
+    const post = box(0.07, 0.34, 0.07, mats.alu);
+    post.position.y = 0.17;
+    clampGrp.add(post);
+    const finger = box(0.07, 0.06, 0.3, mats.gold);
+    finger.position.set(0, 0.36, -Math.sign(cz) * 0.16);
+    clampGrp.add(finger);
+    const openRot = Math.sign(cz) * 1.9;
+    clampGrp.rotation.x = openRot; // built OPEN (pre-mission deck is empty)
+    g.add(clampGrp);
+    clamps.push({ grp: clampGrp, openRot });
   }
 
   // --- propellant tanks peeking between the legs ---
@@ -764,6 +891,7 @@ export function buildLander() {
   g.userData = {
     glows, lamp: new THREE.PointLight(0, 0, 0), ramp: rampRoot, engineGlow,
     plume: { grp: plumeGrp, mats: plumeMats, texs: plumeTexs, glow: nozzleGlow, state: { on: 0 }, len: 3.2 },
+    clamps,
     deckY: DECK_Y,
   };
   g.userData.lamp.intensity = 0; // interface parity with other machines

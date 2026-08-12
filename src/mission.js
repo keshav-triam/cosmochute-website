@@ -80,20 +80,16 @@ export function buildMission(world, gsap, tl) {
   const m1 = new THREE.CatmullRomCurve3([
     parkOf(egress), v(B.x, B.z), v(0.5, -3.5), v(4.5, -7), v(7.5, -8.5), v(9.5, -11), v(D1.x, D1.z),
   ]);
-  const m1r = new THREE.CatmullRomCurve3([
-    parkOf(m1), v(D1.x, D1.z), v(8, -13.5), v(5, -10.5), v(1.5, -6), v(-1.5, -3), v(B.x, B.z),
-  ]);
-  const m2 = new THREE.CatmullRomCurve3([
-    parkOf(m1r), v(B.x, B.z), v(1, 2.5), v(6, 4.5), v(10, 5.5), v(D2.x, D2.z),
-  ]);
-  const m2r = new THREE.CatmullRomCurve3([
-    parkOf(m2), v(D2.x, D2.z), v(9, 8), v(4, 6.5), v(-1, 2.5), v(B.x, B.z),
+  // LINEAR CAMPAIGN: crater to crater, always onward — the convoy
+  // never doubles back to the lander
+  const leg2 = new THREE.CatmullRomCurve3([
+    parkOf(m1), v(D1.x, D1.z), v(13.5, -8), v(15.5, -1.5), v(14.5, 3), v(D2.x, D2.z),
   ]);
   const towCurve = new THREE.CatmullRomCurve3([
-    parkOf(m2r), v(B.x, B.z), v(-6.5, 3.5), v(-9, 7.5), v(TH.x, TH.z),
+    parkOf(leg2), v(D2.x, D2.z), v(17.5, 7.5), v(22, 7), v(26.5, 5.5), v(TH.x, TH.z),
   ]);
   const exitCurve = new THREE.CatmullRomCurve3([
-    v(TH.x, TH.z), v(-4, 10), v(8, 4), v(24, -8), v(SITES.exit.x, SITES.exit.z),
+    v(TH.x, TH.z), v(38, 1), v(50, -3), v(64, -8), v(SITES.exit.x, SITES.exit.z),
   ]);
 
   // ---------------- wheel ruts — carved soil geometry ----------------
@@ -197,8 +193,7 @@ export function buildMission(world, gsap, tl) {
   };
   const ribbons = {
     egress: buildRibbon(egress, 1.0, egressSurfaceY, egressOnSoil),
-    m1: buildRibbon(m1), m1r: buildRibbon(m1r),
-    m2: buildRibbon(m2), m2r: buildRibbon(m2r),
+    m1: buildRibbon(m1), leg2: buildRibbon(leg2),
     tow: buildRibbon(towCurve), exit: buildRibbon(exitCurve),
   };
 
@@ -453,12 +448,15 @@ export function buildMission(world, gsap, tl) {
       grab: solveArm(sl.clone().add(new THREE.Vector3(0, 0.2, 0))),
     };
   };
-  const TA_EGRESS = mkTargets(stopFrame(egress), CART_A); // S4 pick
-  const TA_M1R = mkTargets(stopFrame(m1r), CART_A);       // S5 re-rack
-  const TB_M1R = mkTargets(stopFrame(m1r), CART_B);       // S6 pick
-  const TB_M2R = mkTargets(stopFrame(m2r), CART_B);       // S7 final rack
-  const POSE_CARRY = solveArm(new THREE.Vector3(0.5, 2.2, 0.05));
-  const POSE_BELLY = solveArm(new THREE.Vector3(0.35, 1.2, 0.98)); // side presentation — easy reach, clear of the hull
+  const TA_EGRESS = mkTargets(stopFrame(egress), CART_A); // first pick, by the lander
+  const TA_S1 = mkTargets(stopFrame(m1), CART_A);         // swap at crater site one
+  const TB_S1 = mkTargets(stopFrame(m1), CART_B);         // next payload, same stop
+  const TB_S2 = mkTargets(stopFrame(leg2), CART_B);       // final rack at crater site two
+  const POSE_CARRY = solveArm(new THREE.Vector3(0.5, 2.35, 0.05));
+  // top-loading bay: hover above the open lid, then lower the payload
+  // straight in — the gripper holds it until it is seated
+  const BOX_HOVER = solveArm(new THREE.Vector3(0.6, 2.0, 0.12));
+  const BOX_SEAT = solveArm(new THREE.Vector3(0.6, 1.65, 0.12));
   // cartridge transfer between anchors (slot / wrist / belly). While a
   // transfer targets 'wrist' the cartridge tracks the actual gripper
   // position every frame, so it genuinely rides the arm.
@@ -482,7 +480,14 @@ export function buildMission(world, gsap, tl) {
   }
 
   const arm = epoc.userData.arm;
+  const lid = epoc.userData.payloadLid;
   const tow = oasys.userData.towRoot;
+  function lidOpen(at, dur = 0.1) {
+    tl.to(lid.rotation, { z: 2.05, duration: dur, ease: 'power2.inOut' }, at);
+  }
+  function lidClose(at, dur = 0.1) {
+    tl.to(lid.rotation, { z: 0, duration: dur, ease: 'power2.inOut' }, at);
+  }
   oasys.userData.lampBoost = 0;
   epoc.userData.lampBoost = 0;
 
@@ -505,6 +510,10 @@ export function buildMission(world, gsap, tl) {
   tl.set(epoc.rotation, { y: LANDER_HEADING, z: 0, immediateRender: false }, T.s1 + 0.06);
   tl.set(oasys.position, { x: stowO.x, y: deckTop + STOW_ALT, z: stowO.z, immediateRender: false }, T.s1 + 0.06);
   tl.set(oasys.rotation, { y: LANDER_HEADING, z: 0, immediateRender: false }, T.s1 + 0.06);
+  // launch latches close over the wheels for the ride down
+  for (const cl of lander.userData.clamps) {
+    tl.set(cl.grp.rotation, { x: 0, immediateRender: false }, T.s1 + 0.06);
+  }
   // launch streak from Earth
   const streakProxy = { p: 0 };
   tl.set(streak.material, { opacity: 0.95, immediateRender: false }, T.s1 + 0.12);
@@ -558,8 +567,12 @@ export function buildMission(world, gsap, tl) {
   // ============================================================
   card(2, T.s3 + 0.06, T.s4 - 0.14);
   cam(T.s3, 0.3, { x: -25, y: 2.3, z: 4, tx: SITES.lander.x + 2, ty: 1.5, tz: SITES.lander.z + 2 });
-  // ramp down
-  tl.to(lander.userData.ramp.rotation, { z: -0.314, duration: 0.26, ease: 'power2.inOut' }, T.s3 + 0.02);
+  // launch latches swing open, releasing the convoy…
+  lander.userData.clamps.forEach((cl, i) => {
+    tl.to(cl.grp.rotation, { x: cl.openRot, duration: 0.14, ease: 'back.out(1.6)' }, T.s3 + 0.02 + i * 0.05);
+  });
+  // …then the ramp comes down
+  tl.to(lander.userData.ramp.rotation, { z: -0.314, duration: 0.26, ease: 'power2.inOut' }, T.s3 + 0.06);
   // convoy rolls down and out
   drive(T.s3 + 0.32, 0.78, egress, ribbons.egress, {
     tow: true, fromHitch: true, surfaceY: egressSurfaceY, followTarget: true,
@@ -583,18 +596,24 @@ export function buildMission(world, gsap, tl) {
   carry(cartridges[CART_A], 'slot', 'wrist', T.s4 + 0.31, 0.06);
   // …lifts it high clear of the magazine walls…
   armPose(T.s4 + 0.39, 0.09, TA_EGRESS.hover);
-  // …carries it over the deck…
+  // …carries it over the deck while the bay lid opens…
+  lidOpen(T.s4 + 0.5, 0.12);
   armPose(T.s4 + 0.5, 0.16, POSE_CARRY);
-  // …presents it at the belly chamber mouth, which pulls it in
-  armPose(T.s4 + 0.68, 0.1, POSE_BELLY);
-  carry(cartridges[CART_A], 'wrist', 'belly', T.s4 + 0.79, 0.07);
-  armPose(T.s4 + 0.87, 0.12, POSE_STOW);
+  // …hovers over the open bay, lowers the payload straight in…
+  armPose(T.s4 + 0.66, 0.09, BOX_HOVER);
+  armPose(T.s4 + 0.76, 0.07, BOX_SEAT);
+  carry(cartridges[CART_A], 'wrist', 'belly', T.s4 + 0.84, 0.04);
+  // …lifts clear, and the lid shuts over the payload
+  armPose(T.s4 + 0.89, 0.09, BOX_HOVER);
+  lidClose(T.s4 + 0.99, 0.09);
+  armPose(T.s4 + 0.99, 0.12, POSE_STOW);
   // the whole train advances into the rough zone — trailer and all
   noteArrival(egress);
   turn(T.s4 + 0.9, 0.08, m1, HITCH / m1.getLength());
   cam(T.s4 + 0.97, 0.3, { x: 2.5, y: 3.4, z: -0.5 });
   drive(T.s4 + 1.0, 0.36, m1, ribbons.m1, { tow: true, fromHitch: true, followTarget: true });
   // operate: belly payload live, downlink to the relay orbiter
+  lidOpen(T.s5 - 0.16, 0.08);
   tl.to(cartridges[CART_A].userData, { boost: 1, duration: 0.1 }, T.s5 - 0.12);
   tl.to(beam.material, { opacity: 0.65, duration: 0.1 }, T.s5 - 0.1);
 
@@ -604,73 +623,82 @@ export function buildMission(world, gsap, tl) {
   card(4, T.s5 + 0.06, T.s6 - 0.14);
   tl.to(beam.material, { opacity: 0, duration: 0.08 }, T.s5 + 0.06);
   tl.to(cartridges[CART_A].userData, { boost: 0, duration: 0.08 }, T.s5 + 0.06);
+  lidClose(T.s5 + 0.08, 0.08);
+  // the swap happens RIGHT HERE at crater site one — the magazine is
+  // on the hook behind; nobody drives anywhere
   noteArrival(m1);
-  turn(T.s5 + 0.04, 0.12, m1r, HITCH / m1r.getLength());
-  cam(T.s5 + 0.05, 0.35, { x: 3, y: 2.5, z: 3.5 });
-  drive(T.s5 + 0.14, 0.42, m1r, ribbons.m1r, { tow: true, fromHitch: true, followTarget: true });
-  // back at basecamp — the magazine is right behind, exactly where the
-  // arrival frame says it is
-  noteArrival(m1r);
-  tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s5 + 0.58);
-  cam(T.s5 + 0.56, 0.2, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
-  // the arm collects the spent cartridge at the chamber…
-  armPose(T.s5 + 0.68, 0.12, POSE_BELLY);
-  carry(cartridges[CART_A], 'belly', 'wrist', T.s5 + 0.82, 0.06);
-  // …carries it back over its slot, hovers, lowers, releases — and
-  // lifts clear, exactly like the first pick in reverse
-  armPose(T.s5 + 0.9, 0.16, TA_M1R.hover);
-  armPose(T.s5 + 1.08, 0.07, TA_M1R.grab);
-  carry(cartridges[CART_A], 'wrist', 'slot', T.s5 + 1.16, 0.06);
-  armPose(T.s5 + 1.24, 0.08, TA_M1R.hover);
-  tl.set(cartridges[CART_A].userData, { dimmed: true, immediateRender: false }, T.s5 + 1.22);
+  tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s5 + 0.14);
+  cam(T.s5 + 0.12, 0.3, { x: 5, y: 2.4, z: -7, tx: D1.x, ty: 1.0, tz: D1.z });
+  // lid opens; the arm lifts the spent cartridge out — attached all the way…
+  lidOpen(T.s5 + 0.16, 0.1);
+  armPose(T.s5 + 0.2, 0.1, BOX_HOVER);
+  armPose(T.s5 + 0.32, 0.06, BOX_SEAT);
+  carry(cartridges[CART_A], 'belly', 'wrist', T.s5 + 0.39, 0.04);
+  armPose(T.s5 + 0.44, 0.08, BOX_HOVER);
+  lidClose(T.s5 + 0.53, 0.08);
+  // …racks it home in the magazine…
+  armPose(T.s5 + 0.53, 0.15, TA_S1.hover);
+  armPose(T.s5 + 0.7, 0.06, TA_S1.grab);
+  carry(cartridges[CART_A], 'wrist', 'slot', T.s5 + 0.77, 0.05);
+  tl.set(cartridges[CART_A].userData, { dimmed: true, immediateRender: false }, T.s5 + 0.83);
+  armPose(T.s5 + 0.84, 0.07, TA_S1.hover);
+  // …and takes the next payload straight off the shelf
+  armPose(T.s5 + 0.93, 0.08, TB_S1.hover);
+  armPose(T.s5 + 1.02, 0.06, TB_S1.grab);
+  carry(cartridges[CART_B], 'slot', 'wrist', T.s5 + 1.09, 0.05);
+  armPose(T.s5 + 1.16, 0.08, TB_S1.hover);
 
   // ============================================================
   // S6 — NEXT MISSIONS (fast-cycle montage)
   // ============================================================
   card(5, T.s6 + 0.06, T.s7 - 0.14);
-  // the second pick gets the same full, deliberate treatment as the
-  // first — and the camera stays close to watch it
-  tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s6 + 0.85);
-  armPose(T.s6 + 0.02, 0.1, TB_M1R.hover);
-  armPose(T.s6 + 0.14, 0.07, TB_M1R.grab);
-  carry(cartridges[CART_B], 'slot', 'wrist', T.s6 + 0.22, 0.06);
-  armPose(T.s6 + 0.3, 0.08, TB_M1R.hover);
-  armPose(T.s6 + 0.4, 0.14, POSE_CARRY);
-  armPose(T.s6 + 0.56, 0.1, POSE_BELLY);
-  carry(cartridges[CART_B], 'wrist', 'belly', T.s6 + 0.68, 0.06);
-  armPose(T.s6 + 0.76, 0.12, POSE_STOW);
-  // now the camera pulls wide for the fast-cycle montage
-  cam(T.s6 + 0.88, 0.3, { x: 1, y: 9.5, z: 16, tx: 4, ty: 0, tz: 1 });
-  turn(T.s6 + 0.92, 0.05, m2, HITCH / m2.getLength());
-  drive(T.s6 + 0.98, 0.2, m2, ribbons.m2, { tow: true, fromHitch: true, ease: 'power1.in' });
-  tl.to(cartridges[CART_B].userData, { boost: 1, duration: 0.05 }, T.s6 + 1.19);
-  tl.to(beam.material, { opacity: 0.65, duration: 0.05 }, T.s6 + 1.2);
-  tl.to(beam.material, { opacity: 0, duration: 0.05 }, T.s6 + 1.27);
-  tl.to(cartridges[CART_B].userData, { boost: 0, duration: 0.05 }, T.s6 + 1.28);
-  noteArrival(m2);
-  turn(T.s6 + 1.29, 0.04, m2r, HITCH / m2r.getLength());
-  drive(T.s6 + 1.34, 0.14, m2r, ribbons.m2r, { tow: true, fromHitch: true, ease: 'power1.out' });
+  // payload two goes into the bay…
+  tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s6 + 0.5);
+  lidOpen(T.s6 + 0.04, 0.1);
+  armPose(T.s6 + 0.02, 0.14, POSE_CARRY);
+  armPose(T.s6 + 0.18, 0.08, BOX_HOVER);
+  armPose(T.s6 + 0.28, 0.06, BOX_SEAT);
+  carry(cartridges[CART_B], 'wrist', 'belly', T.s6 + 0.35, 0.04);
+  armPose(T.s6 + 0.4, 0.07, BOX_HOVER);
+  lidClose(T.s6 + 0.48, 0.08);
+  armPose(T.s6 + 0.48, 0.1, POSE_STOW);
+  // …and the convoy rolls ONWARD — never back — to crater site two
+  cam(T.s6 + 0.56, 0.3, { x: 9, y: 8.5, z: 9, tx: 13, ty: 0, tz: -3 });
+  noteArrival(m1);
+  turn(T.s6 + 0.6, 0.06, leg2, HITCH / leg2.getLength());
+  drive(T.s6 + 0.68, 0.54, leg2, ribbons.leg2, { tow: true, fromHitch: true, followTarget: true });
+  // operate at site two, on the crater floor
+  lidOpen(T.s6 + 1.25, 0.06);
+  tl.to(cartridges[CART_B].userData, { boost: 1, duration: 0.05 }, T.s6 + 1.28);
+  tl.to(beam.material, { opacity: 0.65, duration: 0.05 }, T.s6 + 1.29);
+  tl.to(beam.material, { opacity: 0, duration: 0.05 }, T.s6 + 1.41);
+  tl.to(cartridges[CART_B].userData, { boost: 0, duration: 0.05 }, T.s6 + 1.42);
+  lidClose(T.s6 + 1.45, 0.05);
 
   // ============================================================
   // S7 — TRAILER HEAVEN
   // ============================================================
   card(6, T.s7 + 0.06, T.s8 - 0.14);
-  // back from the last sortie — trailer still on the hook behind
-  noteArrival(m2r);
+  // manifest served — rack the last cartridge right here at site two
+  noteArrival(leg2);
   tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s7 + 0.04);
   tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s7 + 0.82);
-  cam(T.s7 + 0.02, 0.2, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
-  // the last cartridge is lifted out of the belly and racked home
-  armPose(T.s7 + 0.14, 0.12, POSE_BELLY);
-  carry(cartridges[CART_B], 'belly', 'wrist', T.s7 + 0.28, 0.06);
-  armPose(T.s7 + 0.36, 0.14, TB_M2R.hover);
-  armPose(T.s7 + 0.52, 0.06, TB_M2R.grab);
-  carry(cartridges[CART_B], 'wrist', 'slot', T.s7 + 0.59, 0.06);
-  tl.set(cartridges[CART_B].userData, { dimmed: true, immediateRender: false }, T.s7 + 0.66);
-  armPose(T.s7 + 0.67, 0.08, TB_M2R.hover);
-  armPose(T.s7 + 0.77, 0.1, POSE_STOW);
-  // still hitched — straight into the final tow to Trailer Heaven
-  cam(T.s7 + 0.9, 0.4, { x: -19, y: 3.0, z: 17 });
+  cam(T.s7 + 0.02, 0.25, { x: 7.5, y: 2.4, z: 11, tx: D2.x, ty: 1.0, tz: D2.z });
+  // the last cartridge comes out of the bay and is racked home
+  lidOpen(T.s7 + 0.06, 0.1);
+  armPose(T.s7 + 0.1, 0.1, BOX_HOVER);
+  armPose(T.s7 + 0.21, 0.06, BOX_SEAT);
+  carry(cartridges[CART_B], 'belly', 'wrist', T.s7 + 0.28, 0.04);
+  armPose(T.s7 + 0.33, 0.07, BOX_HOVER);
+  lidClose(T.s7 + 0.41, 0.08);
+  armPose(T.s7 + 0.41, 0.13, TB_S2.hover);
+  armPose(T.s7 + 0.56, 0.06, TB_S2.grab);
+  carry(cartridges[CART_B], 'wrist', 'slot', T.s7 + 0.63, 0.05);
+  tl.set(cartridges[CART_B].userData, { dimmed: true, immediateRender: false }, T.s7 + 0.69);
+  armPose(T.s7 + 0.7, 0.07, TB_S2.hover);
+  armPose(T.s7 + 0.79, 0.1, POSE_STOW);
+  // still hitched — onward again, the final tow to Trailer Heaven
+  cam(T.s7 + 0.9, 0.4, { x: 16, y: 3.4, z: 16 });
   turn(T.s7 + 0.9, 0.08, towCurve, HITCH / towCurve.getLength());
   drive(T.s7 + 1.02, 0.44, towCurve, ribbons.tow, {
     tow: true, fromHitch: true, followTarget: true,
