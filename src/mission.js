@@ -712,14 +712,14 @@ export function buildMission(world, gsap, tl) {
   card(7, T.s8 + 0.06, null); // stays until the pin releases
   tl.to(tow.rotation, { z: 0.85, y: 0, duration: 0.1 }, T.s8 + 0.02);
   cam(T.s8 + 0.02, 0.35, {
-    x: TH.x - 4.5, y: 1.7, z: TH.z + 6.5,
-    tx: TH.x + 8, ty: 1.2, tz: TH.z - 4,
+    x: TH.x - 6, y: 4.5, z: TH.z + 10,
+    tx: TH.x + 10, ty: 0.8, tz: TH.z - 4,
   });
   noteArrival(towCurve);
   turn(T.s8 + 0.06, 0.1, exitCurve);
   drive(T.s8 + 0.18, 0.85, exitCurve, ribbons.exit, { ease: 'power1.in', followTarget: true });
   // final pull-up as EPOC fades into the fog
-  cam(T.s8 + 0.7, 0.35, { x: TH.x - 5.5, y: 3.2, z: TH.z + 8 });
+  cam(T.s8 + 0.7, 0.35, { x: TH.x - 8, y: 6, z: TH.z + 13, tx: TH.x + 22, ty: 0.5, tz: TH.z - 7 });
   tl.to({}, { duration: 0.001 }, T.end - 0.001); // pad to full duration
 
   return { T, STAGE_STARTS };
