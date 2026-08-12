@@ -428,7 +428,7 @@ export function buildOasys() {
   g.add(bed);
 
   // open-top cartridge magazine
-  const magW = 2.3, magH = 0.62, magD = 1.2, wall = 0.05;
+  const magW = 2.54, magH = 0.62, magD = 1.2, wall = 0.05;
   const magY = 0.64 + magH / 2;
   const walls = [
     { w: magW, h: magH, d: wall, x: 0, z: magD / 2 - wall / 2 },

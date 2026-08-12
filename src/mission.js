@@ -68,23 +68,29 @@ export function buildMission(world, gsap, tl) {
   }
 
   const B = SITES.basecamp, D1 = SITES.deploy1, D2 = SITES.deploy2, TH = SITES.heaven;
+  // CONVOY MODE: OASys is towed on every sortie — the trailer goes
+  // everywhere the rover goes, except the final departure. Each curve
+  // starts at OASys' park point from the PREVIOUS leg, so a fromHitch
+  // drive puts EPOC exactly at its last stop and OASys exactly where
+  // it was parked — zero teleports.
+  const parkOf = (curve) => {
+    const p = curve.getPointAt(1 - HITCH / curve.getLength());
+    return v(p.x, p.z);
+  };
   const m1 = new THREE.CatmullRomCurve3([
-    v(B.x, B.z), v(0.5, -3.5), v(4.5, -7), v(7.5, -8.5), v(9.5, -11), v(D1.x, D1.z),
+    parkOf(egress), v(B.x, B.z), v(0.5, -3.5), v(4.5, -7), v(7.5, -8.5), v(9.5, -11), v(D1.x, D1.z),
   ]);
   const m1r = new THREE.CatmullRomCurve3([
-    v(D1.x, D1.z), v(8, -13.5), v(5, -10.5), v(1.5, -6), v(-1.5, -3), v(B.x, B.z),
+    parkOf(m1), v(D1.x, D1.z), v(8, -13.5), v(5, -10.5), v(1.5, -6), v(-1.5, -3), v(B.x, B.z),
   ]);
   const m2 = new THREE.CatmullRomCurve3([
-    v(B.x, B.z), v(1, 2.5), v(6, 4.5), v(10, 5.5), v(D2.x, D2.z),
+    parkOf(m1r), v(B.x, B.z), v(1, 2.5), v(6, 4.5), v(10, 5.5), v(D2.x, D2.z),
   ]);
   const m2r = new THREE.CatmullRomCurve3([
-    v(D2.x, D2.z), v(9, 8), v(4, 6.5), v(-1, 2.5), v(B.x, B.z),
+    parkOf(m2), v(D2.x, D2.z), v(9, 8), v(4, 6.5), v(-1, 2.5), v(B.x, B.z),
   ]);
-  // tow starts exactly where OASys parked after egress (hitch offset back)
-  const oasysParkP = 1 - HITCH / egress.getLength();
-  const oasysPark = egress.getPointAt(oasysParkP);
   const towCurve = new THREE.CatmullRomCurve3([
-    v(oasysPark.x, oasysPark.z), v(B.x, B.z), v(-6.5, 3.5), v(-9, 7.5), v(TH.x, TH.z),
+    parkOf(m2r), v(B.x, B.z), v(-6.5, 3.5), v(-9, 7.5), v(TH.x, TH.z),
   ]);
   const exitCurve = new THREE.CatmullRomCurve3([
     v(TH.x, TH.z), v(-4, 10), v(8, 4), v(24, -8), v(SITES.exit.x, SITES.exit.z),
@@ -328,7 +334,8 @@ export function buildMission(world, gsap, tl) {
           for (const mm of ribbon.meshes) mm.geometry.setDrawRange(0, dr);
         }
         if (opts.dust !== false) {
-          updateDustTrail(curve, proxy.p, p0, len, opts.surfaceY || terrainHeight);
+          const pBack = proxy.p - ((opts.tow || opts.oasysFollow) ? hitchFrac : 0);
+          updateDustTrail(curve, pBack, 0, len, opts.surfaceY || terrainHeight);
         }
         if (opts.followTarget) {
           curve.getPointAt(Math.min(1, proxy.p + 0.04), pt);
@@ -403,7 +410,7 @@ export function buildMission(world, gsap, tl) {
     const dyaw = Math.abs(pose[0] - armLastYaw);
     const dJoints = Math.abs(pose[1] - armLastPose[1]) + Math.abs(pose[2] - armLastPose[2]);
     armLastPose = pose;
-    if (dyaw > 0.7 || dJoints > 1.6) {
+    if (dyaw > 0.45 || dJoints > 1.6) {
       tl.to(arm.root.rotation, { z: -0.3, duration: dur * 0.35, ease: 'power2.inOut' }, at);
       tl.to(arm.fore.rotation, { z: 0.4, duration: dur * 0.35, ease: 'power2.inOut' }, at);
       tl.to(arm.root.rotation, { y: pose[0], duration: dur * 0.4, ease: 'power1.inOut' }, at + dur * 0.3);
@@ -416,30 +423,42 @@ export function buildMission(world, gsap, tl) {
     armLastYaw = pose[0];
   }
 
-  // exact pick geometry at basecamp, computed from the parked poses
+  // exact pick geometry PER STOP: with the convoy hitched everywhere,
+  // the EPOC<->OASys relative pose depends on each arrival curve's end
+  // curvature — so slot targets are solved from the actual arrival
+  // frames, and no turn-in-place realignment is ever needed
   const UP = new THREE.Vector3(0, 1, 0);
-  const epocPickHeading = heading(egress, 1);
-  const epocPickPos = egress.getPointAt(1);
-  epocPickPos.y = terrainHeight(epocPickPos.x, epocPickPos.z) + 0.04;
-  const oasysPickHeading = heading(egress, oasysParkP);
-  const oasysPickPos = egress.getPointAt(oasysParkP);
-  oasysPickPos.y = terrainHeight(oasysPickPos.x, oasysPickPos.z) + 0.04;
-  function slotInEpocFrame(slotIdx) {
+  function stopFrame(curve) {
+    const hf = HITCH / curve.getLength();
+    const eP = curve.getPointAt(1);
+    eP.y = terrainHeight(eP.x, eP.z) + 0.04;
+    const oP = curve.getPointAt(1 - hf);
+    oP.y = terrainHeight(oP.x, oP.z) + 0.04;
+    return { eH: heading(curve, 1), eP, oH: heading(curve, 1 - hf), oP };
+  }
+  function slotInEpocAt(frame, slotIdx) {
     const sl = oasys.userData.slots[slotIdx].position.clone();
-    sl.applyAxisAngle(UP, oasysPickHeading).add(oasysPickPos);   // -> world
-    sl.sub(epocPickPos).applyAxisAngle(UP, -epocPickHeading);     // -> EPOC local
+    sl.applyAxisAngle(UP, frame.oH).add(frame.oP);   // -> world
+    sl.sub(frame.eP).applyAxisAngle(UP, -frame.eH);   // -> EPOC local
     return sl;
   }
-  // front-row slots nearest the arm — the only ones physically in reach
+  // front-row slots nearest the arm — the only ones physically in reach.
+  // HOVER is high enough that the HANGING cartridge clears the magazine
+  // walls before any lateral swing.
   const CART_A = 7, CART_B = 6;
-  const slotA = slotInEpocFrame(CART_A);
-  const slotB = slotInEpocFrame(CART_B);
-  const HOVER_A = solveArm(slotA.clone().add(new THREE.Vector3(0, 0.55, 0)));
-  const GRAB_A = solveArm(slotA.clone().add(new THREE.Vector3(0, 0.2, 0)));
-  const HOVER_B = solveArm(slotB.clone().add(new THREE.Vector3(0, 0.55, 0)));
-  const GRAB_B = solveArm(slotB.clone().add(new THREE.Vector3(0, 0.2, 0)));
+  const mkTargets = (frame, idx) => {
+    const sl = slotInEpocAt(frame, idx);
+    return {
+      hover: solveArm(sl.clone().add(new THREE.Vector3(0, 0.85, 0))),
+      grab: solveArm(sl.clone().add(new THREE.Vector3(0, 0.2, 0))),
+    };
+  };
+  const TA_EGRESS = mkTargets(stopFrame(egress), CART_A); // S4 pick
+  const TA_M1R = mkTargets(stopFrame(m1r), CART_A);       // S5 re-rack
+  const TB_M1R = mkTargets(stopFrame(m1r), CART_B);       // S6 pick
+  const TB_M2R = mkTargets(stopFrame(m2r), CART_B);       // S7 final rack
   const POSE_CARRY = solveArm(new THREE.Vector3(0.5, 2.2, 0.05));
-  const POSE_BELLY = solveArm(new THREE.Vector3(1.15, 1.3, 0.1)); // wrist stays above the deck line
+  const POSE_BELLY = solveArm(new THREE.Vector3(0.35, 1.2, 0.98)); // side presentation — easy reach, clear of the hull
   // cartridge transfer between anchors (slot / wrist / belly). While a
   // transfer targets 'wrist' the cartridge tracks the actual gripper
   // position every frame, so it genuinely rides the arm.
@@ -557,26 +576,24 @@ export function buildMission(world, gsap, tl) {
   tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s4 + 0.02);
   tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s4 + 0.94);
   // the arm swings over the magazine and hovers above the cartridge…
-  armPose(T.s4 + 0.04, 0.16, HOVER_A);
+  armPose(T.s4 + 0.04, 0.16, TA_EGRESS.hover);
   // …lowers straight onto it…
-  armPose(T.s4 + 0.22, 0.08, GRAB_A);
+  armPose(T.s4 + 0.22, 0.08, TA_EGRESS.grab);
   // …latches — the cartridge is now attached to the gripper…
   carry(cartridges[CART_A], 'slot', 'wrist', T.s4 + 0.31, 0.06);
-  // …lifts it clear of the magazine…
-  armPose(T.s4 + 0.39, 0.09, HOVER_A);
+  // …lifts it high clear of the magazine walls…
+  armPose(T.s4 + 0.39, 0.09, TA_EGRESS.hover);
   // …carries it over the deck…
   armPose(T.s4 + 0.5, 0.16, POSE_CARRY);
   // …presents it at the belly chamber mouth, which pulls it in
   armPose(T.s4 + 0.68, 0.1, POSE_BELLY);
   carry(cartridges[CART_A], 'wrist', 'belly', T.s4 + 0.79, 0.07);
   armPose(T.s4 + 0.87, 0.12, POSE_STOW);
-  // unhitch: tow bar up
-  tl.to(tow.rotation, { z: 0.85, y: 0, duration: 0.1 }, T.s4 + 0.88);
-  // solo traverse into the rough zone
+  // the whole train advances into the rough zone — trailer and all
   noteArrival(egress);
-  turn(T.s4 + 0.9, 0.08, m1);
+  turn(T.s4 + 0.9, 0.08, m1, HITCH / m1.getLength());
   cam(T.s4 + 0.97, 0.3, { x: 2.5, y: 3.4, z: -0.5 });
-  drive(T.s4 + 1.0, 0.36, m1, ribbons.m1, { followTarget: true });
+  drive(T.s4 + 1.0, 0.36, m1, ribbons.m1, { tow: true, fromHitch: true, followTarget: true });
   // operate: belly payload live, downlink to the relay orbiter
   tl.to(cartridges[CART_A].userData, { boost: 1, duration: 0.1 }, T.s5 - 0.12);
   tl.to(beam.material, { opacity: 0.65, duration: 0.1 }, T.s5 - 0.1);
@@ -588,24 +605,23 @@ export function buildMission(world, gsap, tl) {
   tl.to(beam.material, { opacity: 0, duration: 0.08 }, T.s5 + 0.06);
   tl.to(cartridges[CART_A].userData, { boost: 0, duration: 0.08 }, T.s5 + 0.06);
   noteArrival(m1);
-  turn(T.s5 + 0.04, 0.12, m1r);
+  turn(T.s5 + 0.04, 0.12, m1r, HITCH / m1r.getLength());
   cam(T.s5 + 0.05, 0.35, { x: 3, y: 2.5, z: 3.5 });
-  drive(T.s5 + 0.14, 0.42, m1r, ribbons.m1r, { followTarget: true });
-  // back at basecamp: EPOC turns to its exact loading orientation —
-  // the IK poses only line up with the magazine from this heading
+  drive(T.s5 + 0.14, 0.42, m1r, ribbons.m1r, { tow: true, fromHitch: true, followTarget: true });
+  // back at basecamp — the magazine is right behind, exactly where the
+  // arrival frame says it is
   noteArrival(m1r);
-  turnTo(T.s5 + 0.56, 0.1, epocPickHeading);
-  tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s5 + 0.55);
+  tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s5 + 0.58);
   cam(T.s5 + 0.56, 0.2, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
   // the arm collects the spent cartridge at the chamber…
   armPose(T.s5 + 0.68, 0.12, POSE_BELLY);
   carry(cartridges[CART_A], 'belly', 'wrist', T.s5 + 0.82, 0.06);
   // …carries it back over its slot, hovers, lowers, releases — and
   // lifts clear, exactly like the first pick in reverse
-  armPose(T.s5 + 0.9, 0.16, HOVER_A);
-  armPose(T.s5 + 1.08, 0.07, GRAB_A);
+  armPose(T.s5 + 0.9, 0.16, TA_M1R.hover);
+  armPose(T.s5 + 1.08, 0.07, TA_M1R.grab);
   carry(cartridges[CART_A], 'wrist', 'slot', T.s5 + 1.16, 0.06);
-  armPose(T.s5 + 1.24, 0.08, HOVER_A);
+  armPose(T.s5 + 1.24, 0.08, TA_M1R.hover);
   tl.set(cartridges[CART_A].userData, { dimmed: true, immediateRender: false }, T.s5 + 1.22);
 
   // ============================================================
@@ -615,55 +631,48 @@ export function buildMission(world, gsap, tl) {
   // the second pick gets the same full, deliberate treatment as the
   // first — and the camera stays close to watch it
   tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s6 + 0.85);
-  armPose(T.s6 + 0.02, 0.1, HOVER_B);
-  armPose(T.s6 + 0.14, 0.07, GRAB_B);
+  armPose(T.s6 + 0.02, 0.1, TB_M1R.hover);
+  armPose(T.s6 + 0.14, 0.07, TB_M1R.grab);
   carry(cartridges[CART_B], 'slot', 'wrist', T.s6 + 0.22, 0.06);
-  armPose(T.s6 + 0.3, 0.08, HOVER_B);
+  armPose(T.s6 + 0.3, 0.08, TB_M1R.hover);
   armPose(T.s6 + 0.4, 0.14, POSE_CARRY);
   armPose(T.s6 + 0.56, 0.1, POSE_BELLY);
   carry(cartridges[CART_B], 'wrist', 'belly', T.s6 + 0.68, 0.06);
   armPose(T.s6 + 0.76, 0.12, POSE_STOW);
   // now the camera pulls wide for the fast-cycle montage
   cam(T.s6 + 0.88, 0.3, { x: 1, y: 9.5, z: 16, tx: 4, ty: 0, tz: 1 });
-  turn(T.s6 + 0.92, 0.05, m2);
-  drive(T.s6 + 0.98, 0.2, m2, ribbons.m2, { ease: 'power1.in' });
+  turn(T.s6 + 0.92, 0.05, m2, HITCH / m2.getLength());
+  drive(T.s6 + 0.98, 0.2, m2, ribbons.m2, { tow: true, fromHitch: true, ease: 'power1.in' });
   tl.to(cartridges[CART_B].userData, { boost: 1, duration: 0.05 }, T.s6 + 1.19);
   tl.to(beam.material, { opacity: 0.65, duration: 0.05 }, T.s6 + 1.2);
   tl.to(beam.material, { opacity: 0, duration: 0.05 }, T.s6 + 1.27);
   tl.to(cartridges[CART_B].userData, { boost: 0, duration: 0.05 }, T.s6 + 1.28);
   noteArrival(m2);
-  turn(T.s6 + 1.29, 0.04, m2r);
-  drive(T.s6 + 1.34, 0.14, m2r, ribbons.m2r, { ease: 'power1.out' });
+  turn(T.s6 + 1.29, 0.04, m2r, HITCH / m2r.getLength());
+  drive(T.s6 + 1.34, 0.14, m2r, ribbons.m2r, { tow: true, fromHitch: true, ease: 'power1.out' });
 
   // ============================================================
   // S7 — TRAILER HEAVEN
   // ============================================================
   card(6, T.s7 + 0.06, T.s8 - 0.14);
-  // back from the last sortie: line up with the magazine one final time
+  // back from the last sortie — trailer still on the hook behind
   noteArrival(m2r);
-  turnTo(T.s7 + 0.02, 0.1, epocPickHeading);
   tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s7 + 0.04);
   tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s7 + 0.82);
   cam(T.s7 + 0.02, 0.2, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
   // the last cartridge is lifted out of the belly and racked home
   armPose(T.s7 + 0.14, 0.12, POSE_BELLY);
   carry(cartridges[CART_B], 'belly', 'wrist', T.s7 + 0.28, 0.06);
-  armPose(T.s7 + 0.36, 0.14, HOVER_B);
-  armPose(T.s7 + 0.52, 0.06, GRAB_B);
+  armPose(T.s7 + 0.36, 0.14, TB_M2R.hover);
+  armPose(T.s7 + 0.52, 0.06, TB_M2R.grab);
   carry(cartridges[CART_B], 'wrist', 'slot', T.s7 + 0.59, 0.06);
   tl.set(cartridges[CART_B].userData, { dimmed: true, immediateRender: false }, T.s7 + 0.66);
-  armPose(T.s7 + 0.67, 0.08, HOVER_B);
+  armPose(T.s7 + 0.67, 0.08, TB_M2R.hover);
   armPose(T.s7 + 0.77, 0.1, POSE_STOW);
-  // EPOC lines up on the departure heading FIRST, then the tow bar
-  // drops onto the hitch ball in its final geometry and settles home
+  // still hitched — straight into the final tow to Trailer Heaven
   cam(T.s7 + 0.9, 0.4, { x: -19, y: 3.0, z: 17 });
-  turn(T.s7 + 0.86, 0.08, towCurve, HITCH / towCurve.getLength());
-  const towLatch = { p: 0 };
-  tl.to(towLatch, {
-    p: 1, duration: 0.2, ease: 'power2.inOut', immediateRender: false,
-    onUpdate: () => aimTowBar(towLatch.p),
-  }, T.s7 + 0.96);
-  drive(T.s7 + 1.1, 0.38, towCurve, ribbons.tow, {
+  turn(T.s7 + 0.9, 0.08, towCurve, HITCH / towCurve.getLength());
+  drive(T.s7 + 1.02, 0.44, towCurve, ribbons.tow, {
     tow: true, fromHitch: true, followTarget: true,
   });
   // parked: a warm send-off glow

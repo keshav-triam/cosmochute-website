@@ -447,7 +447,7 @@ export function createWorld(canvas) {
         if (fromA === 'belly' || toA === 'belly') {
           // belly transfers slide through the chamber's front corridor —
           // under the hull lip and in, never through the bodywork
-          corridorV.set(1.55, 0.5, 0.1);
+          corridorV.set(0.35, 0.46, 1.3); // side corridor: down past the skirt, then under
           epoc.updateMatrixWorld();
           epoc.localToWorld(corridorV);
           const ib = 1 - b;
