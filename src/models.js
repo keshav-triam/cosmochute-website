@@ -31,6 +31,8 @@ export const mats = {
   }),
   gold: new THREE.MeshStandardMaterial({ color: 0xcf9331, metalness: 0.8, roughness: 0.3 }),
   solar: new THREE.MeshStandardMaterial({ map: T.solar, color: 0xffffff, metalness: 0.55, roughness: 0.3 }),
+  carbon: new THREE.MeshStandardMaterial({ map: T.alu, color: 0x23262b, metalness: 0.6, roughness: 0.5 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x0b0e14, metalness: 0.9, roughness: 0.12 }),
   copper: new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 0.85, roughness: 0.35 }),
   pcb: new THREE.MeshStandardMaterial({ color: 0x1e3a2a, metalness: 0.2, roughness: 0.6 }),
   capSilver: new THREE.MeshStandardMaterial({ color: 0xc8cbd2, metalness: 0.9, roughness: 0.25 }),
@@ -63,8 +65,13 @@ function markShadows(root) {
 }
 
 // ---------------- mesh wheel (lunar-rover style) ----------------
-function meshWheel(r = 0.36, w = 0.26) {
+function meshWheel(r = 0.36, w = 0.26, accent = false) {
   const g = new THREE.Group();
+  if (accent) {
+    const hubRing = new THREE.Mesh(new THREE.TorusGeometry(r * 0.34, 0.016, 8, 16), mats.gold);
+    hubRing.position.z = 0;
+    g.add(hubRing);
+  }
   const rim = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 20, 1, true), mats.wheel);
   rim.rotation.x = Math.PI / 2;
   g.add(rim);
@@ -223,11 +230,90 @@ export function buildEpoc() {
   const g = new THREE.Group();
   const glows = [];
 
-  // --- chassis deck ---
-  const chassis = box(2.05, 0.42, 1.3, mats.body);
-  chassis.position.y = 0.98;
-  edges(chassis);
-  g.add(chassis);
+  // --- faceted hull: carbon underbody, chamfered skirts, white deck.
+  // Same bounding envelope as the old chassis (top 1.19, +-1.02, +-0.65)
+  // so every verified arm/cartridge clearance still holds.
+  const hullLow = box(1.9, 0.3, 1.24, mats.carbon);
+  hullLow.position.y = 0.9;
+  g.add(hullLow);
+  const deckP = box(2.05, 0.26, 1.26, mats.body);
+  deckP.position.y = 1.06;
+  edges(deckP);
+  g.add(deckP);
+  for (const side of [-1, 1]) {
+    // chamfered side skirt
+    const skirt = box(1.95, 0.34, 0.28, mats.carbon);
+    skirt.position.set(0, 0.96, side * 0.62);
+    skirt.rotation.x = side * 0.55;
+    g.add(skirt);
+    // amber running line along the skirt shoulder
+    const runLine = box(1.65, 0.024, 0.024, makeGlowMat(ACCENT, 0x1a1206));
+    runLine.position.set(0, 1.115, side * 0.665);
+    glows.push(runLine.material);
+    g.add(runLine);
+  }
+  // angled dark-glass visor nose with an integrated light bar
+  const visor = box(0.34, 0.3, 1.04, mats.glass);
+  visor.position.set(1.08, 1.0, 0);
+  visor.rotation.z = -0.5;
+  g.add(visor);
+  const lightBar = box(0.03, 0.05, 0.82, makeGlowMat(0xfff3d0, 0x211d15));
+  lightBar.position.set(1.2, 1.06, 0);
+  lightBar.rotation.z = -0.5;
+  glows.push(lightBar.material);
+  g.add(lightBar);
+  // carbon tail panel + angled radiator fins
+  const tail = box(0.3, 0.28, 1.06, mats.carbon);
+  tail.position.set(-1.06, 0.97, 0);
+  tail.rotation.z = 0.45;
+  g.add(tail);
+  for (let i = 0; i < 5; i++) {
+    const fin = box(0.15, 0.2, 0.018, mats.body);
+    fin.position.set(-1.12, 1.14, -0.4 + i * 0.2);
+    fin.rotation.z = 0.5;
+    g.add(fin);
+  }
+  // mission decals: unit wordmark on both deck flanks + hazard plate
+  const decalCanvas = document.createElement('canvas');
+  decalCanvas.width = 256; decalCanvas.height = 64;
+  const dctx2 = decalCanvas.getContext('2d');
+  dctx2.fillStyle = '#ffb43c';
+  dctx2.fillRect(6, 8, 10, 48);
+  dctx2.fillStyle = '#e8e5df';
+  dctx2.font = '700 40px Arial';
+  dctx2.fillText('EPOC-1', 28, 48);
+  dctx2.fillStyle = '#8e8b84';
+  dctx2.font = '700 14px Arial';
+  dctx2.fillText('COSMOCHUTE LEAP', 30, 60);
+  const decalTex = new THREE.CanvasTexture(decalCanvas);
+  decalTex.colorSpace = THREE.SRGBColorSpace;
+  for (const side of [-1, 1]) {
+    const decal = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.13), new THREE.MeshStandardMaterial({
+      map: decalTex, transparent: true, roughness: 0.6, metalness: 0.1,
+      polygonOffset: true, polygonOffsetFactor: -1,
+    }));
+    decal.position.set(-0.25, 1.07, side * 0.633);
+    decal.rotation.y = side > 0 ? 0 : Math.PI;
+    g.add(decal);
+  }
+  const chevCanvas = document.createElement('canvas');
+  chevCanvas.width = chevCanvas.height = 64;
+  const cctx = chevCanvas.getContext('2d');
+  for (let i = -2; i < 6; i++) {
+    cctx.fillStyle = i % 2 ? '#141414' : '#ffb43c';
+    cctx.beginPath();
+    cctx.moveTo(i * 16, 0); cctx.lineTo(i * 16 + 16, 0);
+    cctx.lineTo(i * 16 + 32, 64); cctx.lineTo(i * 16 + 16, 64);
+    cctx.fill();
+  }
+  const chevTex = new THREE.CanvasTexture(chevCanvas);
+  chevTex.colorSpace = THREE.SRGBColorSpace;
+  const chevPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.08), new THREE.MeshStandardMaterial({
+    map: chevTex, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1,
+  }));
+  chevPlate.position.set(0.25, 1.192, 0.42);
+  chevPlate.rotation.x = -Math.PI / 2;
+  g.add(chevPlate);
 
   // gold MLI-wrapped avionics module
   const avionics = box(0.85, 0.4, 1.0, mats.mli);
@@ -302,10 +388,14 @@ export function buildEpoc() {
     bogie.rotation.z = -0.28;
     g.add(bogie);
     for (const x of [-0.95, 0.05, 0.95]) {
-      const w = meshWheel(wheelR, 0.26);
+      const w = meshWheel(wheelR, 0.26, true);
       w.position.set(x, wheelR, z);
       g.add(w);
       wheels.push(w);
+      // carbon fender arch riding over each wheel
+      const fender = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.045, 8, 14, Math.PI), mats.carbon);
+      fender.position.set(x, 0.5, z);
+      g.add(fender);
     }
   }
 
