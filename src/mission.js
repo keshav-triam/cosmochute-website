@@ -144,7 +144,8 @@ export function buildMission(world, gsap, tl) {
         const bermR = 0.05 + (rh(i + 991, lane * 13) - 0.5) * 0.038;
         const floorJ = (rh(i, lane * 7) - 0.5) * 0.014;
         const ring = RUT_PROF.map(([off, hh], k) => {
-          const lat = masked ? lane / 2 : lane / 2 + off + wander;
+          // lane IS the wheel centre offset (EPOC wheels run at z = ±0.78)
+          const lat = masked ? lane : lane + off + wander;
           const isFloor = k === 2 || k === 3;
           let h;
           if (masked) h = 0.01;
