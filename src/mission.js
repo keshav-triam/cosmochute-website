@@ -374,7 +374,7 @@ export function buildMission(world, gsap, tl) {
   // against real target points so the gripper actually arrives where
   // the cartridge is — no more pantomime.
   const ARM_L1 = epoc.userData.arm.lengths.l1, ARM_L2 = epoc.userData.arm.lengths.l2;
-  const ARM_ROOT_LOCAL = new THREE.Vector3(-0.85, 1.22, 0.45);
+  const ARM_ROOT_LOCAL = new THREE.Vector3(-0.95, 1.72, 0);
   function solveArm(targetLocal) {
     const d = targetLocal.clone().sub(ARM_ROOT_LOCAL);
     const yaw = Math.atan2(-d.z, d.x);
@@ -392,13 +392,18 @@ export function buildMission(world, gsap, tl) {
     return [yaw, branches[0].s, branches[0].e];
   }
   // poses: [root yaw, shoulder, elbow]
-  const POSE_STOW = [0, -1.35, 2.6];
+  const POSE_STOW = [0, 0.15, -2.4];
   // big yaw changes route through a raised elbow-up posture so the arm
   // sweeps OVER the rover instead of slicing through mast and deck
   let armLastYaw = 0;
+  let armLastPose = POSE_STOW;
   function armPose(at, dur, pose) {
+    // route through the raised posture whenever the shoulder or elbow
+    // swings substantially — mid-interpolation dips are what clip
     const dyaw = Math.abs(pose[0] - armLastYaw);
-    if (dyaw > 0.7) {
+    const dJoints = Math.abs(pose[1] - armLastPose[1]) + Math.abs(pose[2] - armLastPose[2]);
+    armLastPose = pose;
+    if (dyaw > 0.7 || dJoints > 1.6) {
       tl.to(arm.root.rotation, { z: -0.3, duration: dur * 0.35, ease: 'power2.inOut' }, at);
       tl.to(arm.fore.rotation, { z: 0.4, duration: dur * 0.35, ease: 'power2.inOut' }, at);
       tl.to(arm.root.rotation, { y: pose[0], duration: dur * 0.4, ease: 'power1.inOut' }, at + dur * 0.3);
@@ -429,12 +434,12 @@ export function buildMission(world, gsap, tl) {
   const CART_A = 7, CART_B = 6;
   const slotA = slotInEpocFrame(CART_A);
   const slotB = slotInEpocFrame(CART_B);
-  const HOVER_A = solveArm(slotA.clone().add(new THREE.Vector3(0, 0.5, 0)));
-  const GRAB_A = solveArm(slotA.clone().add(new THREE.Vector3(0, 0.16, 0)));
-  const HOVER_B = solveArm(slotB.clone().add(new THREE.Vector3(0, 0.5, 0)));
-  const GRAB_B = solveArm(slotB.clone().add(new THREE.Vector3(0, 0.16, 0)));
-  const POSE_CARRY = solveArm(new THREE.Vector3(0.15, 2.1, 0.35));
-  const POSE_BELLY = solveArm(new THREE.Vector3(1.3, 0.95, 0.18));
+  const HOVER_A = solveArm(slotA.clone().add(new THREE.Vector3(0, 0.55, 0)));
+  const GRAB_A = solveArm(slotA.clone().add(new THREE.Vector3(0, 0.2, 0)));
+  const HOVER_B = solveArm(slotB.clone().add(new THREE.Vector3(0, 0.55, 0)));
+  const GRAB_B = solveArm(slotB.clone().add(new THREE.Vector3(0, 0.2, 0)));
+  const POSE_CARRY = solveArm(new THREE.Vector3(0.5, 2.2, 0.05));
+  const POSE_BELLY = solveArm(new THREE.Vector3(1.15, 1.3, 0.1)); // wrist stays above the deck line
   // cartridge transfer between anchors (slot / wrist / belly). While a
   // transfer targets 'wrist' the cartridge tracks the actual gripper
   // position every frame, so it genuinely rides the arm.

@@ -427,7 +427,7 @@ export function createWorld(canvas) {
       epoc.userData.bellyAnchor.getWorldPosition(out);
     } else { // 'wrist' — hang just below the gripper fingers
       epoc.userData.arm.wristTip.getWorldPosition(out);
-      out.y -= 0.1;
+      out.y -= 0.2;
     }
     return out;
   }
@@ -447,7 +447,7 @@ export function createWorld(canvas) {
         if (fromA === 'belly' || toA === 'belly') {
           // belly transfers slide through the chamber's front corridor —
           // under the hull lip and in, never through the bodywork
-          corridorV.set(1.35, 0.48, 0.1);
+          corridorV.set(1.55, 0.5, 0.1);
           epoc.updateMatrixWorld();
           epoc.localToWorld(corridorV);
           const ib = 1 - b;
@@ -600,11 +600,12 @@ export function createWorld(canvas) {
       for (const g of m.userData.glows) g.emissiveIntensity = glowI;
     }
     for (const c of cartridges) {
-      // dimmed = spent payload; boost = actively operating (mission-set)
+      // dimmed = spent payload; boost = operating; held = in the gripper
       const dim = c.userData.dimmed ? 0.15 : 1;
       const boost = c.userData.boost || 0;
-      c.userData.led.emissiveIntensity = glowI * dim + boost * 3;
-      c.userData.window.emissiveIntensity = glowI * 0.7 * dim + boost * 2;
+      const held = (c.userData.fromA === 'wrist' || c.userData.toA === 'wrist') ? 2.6 : 0;
+      c.userData.led.emissiveIntensity = glowI * dim + boost * 3 + held;
+      c.userData.window.emissiveIntensity = glowI * 0.7 * dim + boost * 2 + held * 0.8;
     }
     cartDisplay.userData.led.emissiveIntensity = glowI;
     cartDisplay.userData.window.emissiveIntensity = glowI;

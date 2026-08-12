@@ -191,7 +191,9 @@ function greebleCluster(seed, w, d) {
 export const CART_W = 0.52, CART_H = 0.17, CART_D = 0.30;
 export function buildCartridge(idx = 0) {
   const g = new THREE.Group();
-  const bodyC = box(CART_W, CART_H, CART_D, mats.black);
+  const bodyC = box(CART_W, CART_H, CART_D, new THREE.MeshStandardMaterial({
+    color: 0x23262c, metalness: 0.35, roughness: 0.5,
+  }));
   edges(bodyC, new THREE.LineBasicMaterial({ color: 0x55575c, transparent: true, opacity: 0.2 }));
   g.add(bodyC);
   // top regolith hatch
@@ -209,7 +211,7 @@ export function buildCartridge(idx = 0) {
     g.add(rail);
   }
   // status LED
-  const led = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), makeGlowMat(ACCENT));
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), makeGlowMat(ACCENT));
   led.position.set(CART_W / 2 - 0.05, CART_H / 2 + 0.015, CART_D / 2 - 0.05);
   g.add(led);
   g.userData = { led: led.material, window: win.material, idx };
@@ -320,9 +322,19 @@ export function buildEpoc() {
   dishTip.position.set(-0.95, 1.85, -0.4);
   g.add(dishTip);
 
-  // --- robotic arm (shoulder / elbow / wrist), rear-left ---
+  // --- robotic arm on a rear-centre pedestal: clean air on every
+  // side, clear of the avionics module (the old side-mount was embedded
+  // against it, so most folds clipped straight through) ---
+  // tall pedestal: the shoulder sits ABOVE the whole deck skyline
+  // (avionics roof 1.6), so every reach arcs over the bodywork
+  const pedestal = cyl(0.09, 0.12, 0.53, 12, mats.dark);
+  pedestal.position.set(-0.95, 1.455, 0);
+  g.add(pedestal);
+  const pedRing = cyl(0.13, 0.13, 0.04, 12, mats.gold);
+  pedRing.position.set(-0.95, 1.7, 0);
+  g.add(pedRing);
   const armRoot = new THREE.Group();
-  armRoot.position.set(-0.85, 1.22, 0.45);
+  armRoot.position.set(-0.95, 1.72, 0);
   const shoulderHub = cyl(0.09, 0.09, 0.14, 12, mats.gold);
   armRoot.add(shoulderHub);
   const ARM_L1 = 1.05, ARM_L2 = 1.0;
@@ -347,16 +359,24 @@ export function buildEpoc() {
     finger.position.set(s * 0.035, ARM_L2 - 0.05, 0);
     fore.add(finger);
   }
+  // grapple pendant: the payload visibly hangs from this, separated
+  // from the arm — reads as a held object even in silhouette
+  const pendant = cyl(0.014, 0.014, 0.14, 6, mats.alu);
+  pendant.position.y = ARM_L2 + 0.07;
+  fore.add(pendant);
+  const hook = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.012, 6, 12), mats.gold);
+  hook.position.y = ARM_L2 + 0.15;
+  fore.add(hook);
   const wristTip = new THREE.Object3D();
   wristTip.position.y = ARM_L2;
   fore.add(wristTip);
   upper.add(fore);
   armRoot.add(upper);
   g.add(armRoot);
-  // stowed: compact Z-fold held above the deck (elbow stays clear of
-  // the chassis — the long arm would otherwise poke through it)
-  armRoot.rotation.z = -1.35;
-  fore.rotation.z = 2.6;
+  // stowed: upright crane-fold — upper arm near vertical, forearm
+  // draped forward-down, everything above the avionics roofline
+  armRoot.rotation.z = 0.15;
+  fore.rotation.z = -2.4;
 
   // --- lights ---
   // beacon mast: the light sits ON something, not in mid-air
