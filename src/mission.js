@@ -16,6 +16,7 @@
 // cartridges by mode/arcT state, cameras by pose tweens.
 // ============================================================
 import * as THREE from 'three';
+import { T as TEX } from './textures.js';
 
 // stage boundary times (timeline seconds); END is total duration
 export const T = {
@@ -26,7 +27,7 @@ export const STAGE_STARTS = [T.s1, T.s2, T.s3, T.s4, T.s5, T.s6, T.s7, T.s8];
 
 export function buildMission(world, gsap, tl) {
   const { actors, camState: cs, terrainHeight, SITES, scene } = world;
-  const { epoc, oasys, cartridges, cartDisplay, plinth, lander, beam, streak, trail, streakCurve, trailPos, trailGeo, dust } = actors;
+  const { epoc, oasys, cartridges, cartDisplay, plinth, lander, beam, streak, trail, streakCurve, trailPos, trailGeo, dust, scorch } = actors;
 
   const landerY = terrainHeight(SITES.lander.x, SITES.lander.z);
   const LANDER_HEADING = -0.53; // ramp faces basecamp
@@ -89,48 +90,31 @@ export function buildMission(world, gsap, tl) {
     v(TH.x, TH.z), v(-4, 10), v(8, 4), v(24, -8), v(SITES.exit.x, SITES.exit.z),
   ]);
 
-  // ---------------- wheel-track ribbons ----------------
-  // Twin tread strips at the real wheel gauge — grouser imprints and
-  // pushed-up berms via a bump-mapped tread texture, lit by the sun so
-  // the relief reads as displaced soil, not a painted fade.
-  function makeTreadTexture() {
-    const c = document.createElement('canvas');
-    c.width = 64; c.height = 64;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = '#3e3a33';
-    ctx.fillRect(0, 0, 64, 64);
-    for (let y = 0; y < 64; y += 8) {
-      ctx.fillStyle = 'rgba(16,14,12,0.9)';   // grouser trench
-      ctx.fillRect(0, y, 64, 3);
-      ctx.fillStyle = 'rgba(150,140,124,0.55)'; // pushed ridge
-      ctx.fillRect(0, y + 3, 64, 2);
-    }
-    ctx.fillStyle = 'rgba(160,150,134,0.6)';   // side berms
-    ctx.fillRect(0, 0, 6, 64);
-    ctx.fillRect(58, 0, 6, 64);
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }
-  const treadTex = makeTreadTexture();
-  const trackMat = new THREE.MeshStandardMaterial({
-    map: treadTex, bumpMap: treadTex, bumpScale: 3,
-    roughness: 1, metalness: 0,
-    transparent: true, opacity: 0.95,
-    polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false,
+  // ---------------- wheel ruts — carved soil geometry ----------------
+  // Actual depressions, not decals: each wheel lane is a lit 3D trench —
+  // pushed-up berms flanking a sunken floor corrugated by transverse
+  // grouser bites. UV-mapped to the same regolith texture as the ground
+  // so the soil reads continuous; the geometry does the depressing.
+  const rutMat = new THREE.MeshStandardMaterial({
+    map: TEX.regolithRim, color: 0xb2aa9c, roughness: 1, metalness: 0,
+    polygonOffset: true, polygonOffsetFactor: -2,
   });
-  const TRACK_GAUGE = 0.78, TRACK_W = 0.34;
+  const TRACK_GAUGE = 0.78;
+  const UVS = 58 / 460; // identical world->uv scale as the terrain map
+  // cross-section: [lateral offset, height offset]; middle two ride the floor
+  const RUT_PROF = [
+    [-0.3, 0.0], [-0.21, 0.055], [-0.115, 0.012],
+    [0.115, 0.012], [0.21, 0.055], [0.3, 0.0],
+  ];
   function buildRibbon(curve, widthIgnored = 0.95, surfaceFn = null, maskFn = null) {
     const N = 130;
     const meshes = [];
     const pt = new THREE.Vector3(), tan = new THREE.Vector3();
     const side = new THREE.Vector3();
     for (const lane of [-TRACK_GAUGE, TRACK_GAUGE]) {
-      const posArr = new Float32Array(N * 6 * 3);
-      const uvArr = new Float32Array(N * 6 * 2);
-      const prevL = new THREE.Vector3(), prevR = new THREE.Vector3();
-      let prevV = 0, dist = 0;
+      const posArr = new Float32Array(N * 30 * 3);
+      const uvArr = new Float32Array(N * 30 * 2);
+      let prevRing = null, dist = 0;
       const prevPt = new THREE.Vector3();
       for (let i = 0; i <= N; i++) {
         const p = i / N;
@@ -140,26 +124,36 @@ export function buildMission(world, gsap, tl) {
         if (i > 0) dist += pt.distanceTo(prevPt);
         prevPt.copy(pt);
         const masked = maskFn && !maskFn(pt.x, pt.z);
-        const y = (surfaceFn || terrainHeight)(pt.x, pt.z) + 0.045;
-        const c0 = lane / 2 - (masked ? 0 : TRACK_W / 2);
-        const c1 = lane / 2 + (masked ? 0 : TRACK_W / 2);
-        const L = new THREE.Vector3(pt.x + side.x * c0, y, pt.z + side.z * c0);
-        const R = new THREE.Vector3(pt.x + side.x * c1, y, pt.z + side.z * c1);
-        const v = dist / 0.55; // tread repeat along the path
-        if (i > 0) {
-          const o = (i - 1) * 18, ou = (i - 1) * 12;
-          posArr.set([prevL.x, prevL.y, prevL.z, prevR.x, prevR.y, prevR.z, L.x, L.y, L.z], o);
-          posArr.set([prevR.x, prevR.y, prevR.z, R.x, R.y, R.z, L.x, L.y, L.z], o + 9);
-          uvArr.set([0, prevV, 1, prevV, 0, v], ou);
-          uvArr.set([1, prevV, 1, v, 0, v], ou + 6);
+        const y0 = (surfaceFn || terrainHeight)(pt.x, pt.z);
+        // grouser bites: the floor rises and falls along the run
+        const bite = (Math.floor(dist / 0.42) % 2) ? 0.0 : 0.03;
+        const ring = RUT_PROF.map(([off, hh], k) => {
+          const lat = masked ? lane / 2 : lane / 2 + off;
+          const isFloor = k === 2 || k === 3;
+          const h = masked ? 0.01 : hh + (isFloor ? bite : 0);
+          return [pt.x + side.x * lat, y0 + 0.015 + h, pt.z + side.z * lat];
+        });
+        if (i > 0 && prevRing) {
+          const o = (i - 1) * 90, ou = (i - 1) * 60;
+          let w = 0, wu = 0;
+          for (let q = 0; q < 5; q++) {
+            const a = prevRing[q], b2 = prevRing[q + 1], c2 = ring[q], d2 = ring[q + 1];
+            posArr.set([...a, ...b2, ...c2, ...b2, ...d2, ...c2], o + w);
+            w += 18;
+            for (const vtx of [a, b2, c2, b2, d2, c2]) {
+              uvArr[ou + wu] = vtx[0] * UVS;
+              uvArr[ou + wu + 1] = vtx[2] * UVS;
+              wu += 2;
+            }
+          }
         }
-        prevL.copy(L); prevR.copy(R); prevV = v;
+        prevRing = ring;
       }
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
       g.setAttribute('uv', new THREE.BufferAttribute(uvArr, 2));
       g.computeVertexNormals();
-      const mesh = new THREE.Mesh(g, trackMat);
+      const mesh = new THREE.Mesh(g, rutMat);
       mesh.frustumCulled = false;
       mesh.receiveShadow = true;
       g.setDrawRange(0, 0);
@@ -230,6 +224,48 @@ export function buildMission(world, gsap, tl) {
   // cumulative wheel distance baseline per segment, for continuous spin
   let epocDistBase = 0, oasysDistBase = 0;
   const hitchBall = new THREE.Vector3();
+
+  // wheel dust: a string of puffs hanging behind the vehicle, a pure
+  // function of drive progress (scrub-safe), rising and fading with age
+  const dustCanvas = document.createElement('canvas');
+  dustCanvas.width = dustCanvas.height = 64;
+  {
+    const dctx = dustCanvas.getContext('2d');
+    const dg = dctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    dg.addColorStop(0, 'rgba(255,255,255,0.85)');
+    dg.addColorStop(0.45, 'rgba(255,255,255,0.3)');
+    dg.addColorStop(1, 'rgba(255,255,255,0)');
+    dctx.fillStyle = dg;
+    dctx.fillRect(0, 0, 64, 64);
+  }
+  const dustSprites = [];
+  for (let i = 0; i < 9; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(dustCanvas), color: 0x8f887b,
+      transparent: true, opacity: 0, depthWrite: false,
+    }));
+    const sc = 0.5 + i * 0.32;
+    sp.scale.set(sc, sc * 0.7, 1);
+    scene.add(sp);
+    dustSprites.push(sp);
+  }
+  const dustPt = new THREE.Vector3();
+  function updateDustTrail(curve, p, p0, len, sf) {
+    const act = Math.sin(Math.PI * THREE.MathUtils.clamp((p - p0) / Math.max(0.001, 1 - p0), 0, 1));
+    for (let i = 0; i < dustSprites.length; i++) {
+      const sp = dustSprites[i];
+      const pi = p - ((i + 1) * 0.55) / len;
+      if (pi <= 0) { sp.material.opacity = 0; continue; }
+      curve.getPointAt(pi, dustPt);
+      const wob = Math.sin(pi * 53 + i * 2.1) * 0.16;
+      sp.position.set(
+        dustPt.x + wob,
+        sf(dustPt.x, dustPt.z) + 0.16 + i * 0.055,
+        dustPt.z - wob,
+      );
+      sp.material.opacity = act * (0.15 - i * 0.012);
+    }
+  }
   // aim the tow bar at EPOC's hitch ball; blend 0 = raised, 1 = latched
   function aimTowBar(blend) {
     epoc.updateMatrixWorld();
@@ -266,8 +302,11 @@ export function buildMission(world, gsap, tl) {
           aimTowBar(1);
         }
         if (ribbon) {
-          const dr = Math.floor(proxy.p * ribbon.N) * 6;
+          const dr = Math.floor(proxy.p * ribbon.N) * 30;
           for (const mm of ribbon.meshes) mm.geometry.setDrawRange(0, dr);
+        }
+        if (opts.dust !== false) {
+          updateDustTrail(curve, proxy.p, p0, len, opts.surfaceY || terrainHeight);
         }
         if (opts.followTarget) {
           curve.getPointAt(Math.min(1, proxy.p + 0.04), pt);
@@ -372,8 +411,8 @@ export function buildMission(world, gsap, tl) {
   const GRAB_A = solveArm(slotA.clone().add(new THREE.Vector3(0, 0.16, 0)));
   const HOVER_B = solveArm(slotB.clone().add(new THREE.Vector3(0, 0.5, 0)));
   const GRAB_B = solveArm(slotB.clone().add(new THREE.Vector3(0, 0.16, 0)));
-  const POSE_CARRY = solveArm(new THREE.Vector3(0.3, 2.0, 0.25));
-  const POSE_BELLY = solveArm(new THREE.Vector3(0.62, 0.92, 0.15));
+  const POSE_CARRY = solveArm(new THREE.Vector3(0.15, 2.1, 0.35));
+  const POSE_BELLY = solveArm(new THREE.Vector3(1.3, 0.95, 0.18));
   // cartridge transfer between anchors (slot / wrist / belly). While a
   // transfer targets 'wrist' the cartridge tracks the actual gripper
   // position every frame, so it genuinely rides the arm.
@@ -462,6 +501,8 @@ export function buildMission(world, gsap, tl) {
   tl.set(dust.scale, { x: 2, y: 0.7, immediateRender: false }, T.s2 + 0.8);
   tl.to(dust.scale, { x: 22, y: 5, duration: 0.5, ease: 'power2.out' }, T.s2 + 0.82);
   tl.to(dust.material, { opacity: 0, duration: 0.45, ease: 'power1.out' }, T.s2 + 0.86);
+  // the engine leaves a scorched patch on the pad, permanently
+  tl.to(scorch.material, { opacity: 0.5, duration: 0.3 }, T.s2 + 0.82);
   tl.to(cs, { shake: 0, duration: 0.25 }, T.s2 + 0.9);
 
   // ============================================================
@@ -473,7 +514,8 @@ export function buildMission(world, gsap, tl) {
   tl.to(lander.userData.ramp.rotation, { z: -0.314, duration: 0.26, ease: 'power2.inOut' }, T.s3 + 0.02);
   // convoy rolls down and out
   drive(T.s3 + 0.32, 0.78, egress, ribbons.egress, {
-    tow: true, fromHitch: true, surfaceY: egressSurfaceY, followTarget: true, ease: 'power1.inOut',
+    tow: true, fromHitch: true, surfaceY: egressSurfaceY, followTarget: true,
+    ease: 'power1.inOut', dust: false,
   });
   cam(T.s3 + 0.5, 0.5, { x: -14, y: 2.4, z: 6 });
 

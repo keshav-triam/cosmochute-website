@@ -103,7 +103,7 @@ export function createWorld(canvas) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x030408);
-  scene.fog = new THREE.FogExp2(0x05060a, 0.0055);
+  scene.fog = new THREE.FogExp2(0x05060a, 0.003);
 
   // subtle environment reflections for the metals, generated from the
   // real sky panorama (mostly dark, with the galactic band as a streak)
@@ -155,7 +155,7 @@ export function createWorld(canvas) {
   scene.add(earthshine);
 
   // ---------------- terrain ----------------
-  const T_SIZE = 460, T_SEG = 220;
+  const T_SIZE = 460, T_SEG = 264;
   const terrainGeo = new THREE.PlaneGeometry(T_SIZE, T_SIZE, T_SEG, T_SEG);
   terrainGeo.rotateX(-Math.PI / 2);
   const pos = terrainGeo.attributes.position;
@@ -278,6 +278,39 @@ export function createWorld(canvas) {
   rocks.count = placed;
   scene.add(rocks);
 
+  // pebble field: small stones scattered thick through the play area —
+  // ground clutter is half of what makes regolith read as real
+  const PEBBLES = 1700;
+  const pebbleGeo = new THREE.DodecahedronGeometry(1, 0);
+  const pebbleMat = new THREE.MeshStandardMaterial({
+    map: TEX.rock, normalMap: TEX.rockN, color: 0xaaa499, roughness: 1, flatShading: true,
+  });
+  const pebbles = new THREE.InstancedMesh(pebbleGeo, pebbleMat, PEBBLES);
+  pebbles.castShadow = true;
+  pebbles.receiveShadow = true;
+  let pplaced = 0, ptries = 0;
+  while (pplaced < PEBBLES && ptries < 12000) {
+    ptries++;
+    const i = ptries + 9000;
+    const aa = hash(i, 17) * Math.PI * 2;
+    const rr = 3 + Math.pow(hash(i, 23), 0.6) * 52;
+    const x = Math.cos(aa) * rr, z = Math.sin(aa) * rr;
+    // keep the pads where hardware parks visually clean
+    if (Math.hypot(x - SITES.lander.x, z - SITES.lander.z) < 5.6) continue;
+    if (Math.hypot(x - SITES.basecamp.x, z - SITES.basecamp.z) < 2.2) continue;
+    if (Math.hypot(x - SITES.heaven.x, z - SITES.heaven.z) < 2.2) continue;
+    const s = 0.03 + Math.pow(hash(i, 37), 1.8) * 0.13;
+    m4.compose(
+      new THREE.Vector3(x, terrainHeight(x, z) + s * 0.3, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(hash(i, 41) * 3, hash(i, 43) * 3, hash(i, 47) * 3)),
+      new THREE.Vector3(s, s * 0.7, s),
+    );
+    pebbles.setMatrixAt(pplaced, m4);
+    pplaced++;
+  }
+  pebbles.count = pplaced;
+  scene.add(pebbles);
+
   // ---------------- starfield ----------------
   const starCount = 2400;
   const starPos = new Float32Array(starCount * 3);
@@ -386,6 +419,7 @@ export function createWorld(canvas) {
   }
   const anchorA = new THREE.Vector3();
   const anchorB = new THREE.Vector3();
+  const corridorV = new THREE.Vector3();
   function anchorPos(c, name, out) {
     if (name === 'slot') {
       oasys.userData.slots[c.userData.idx].getWorldPosition(out);
@@ -410,10 +444,23 @@ export function createWorld(canvas) {
         const b = THREE.MathUtils.smoothstep(c.userData.blend, 0, 1);
         anchorPos(c, fromA, anchorA);
         anchorPos(c, toA, anchorB);
-        c.position.lerpVectors(anchorA, anchorB, b);
-        // small arc so the cartridge clears the magazine rim
-        const lift = (fromA === 'slot' || toA === 'slot') ? 0.35 : 0.12;
-        c.position.y += Math.sin(b * Math.PI) * lift;
+        if (fromA === 'belly' || toA === 'belly') {
+          // belly transfers slide through the chamber's front corridor —
+          // under the hull lip and in, never through the bodywork
+          corridorV.set(1.35, 0.48, 0.1);
+          epoc.updateMatrixWorld();
+          epoc.localToWorld(corridorV);
+          const ib = 1 - b;
+          c.position.set(
+            ib * ib * anchorA.x + 2 * ib * b * corridorV.x + b * b * anchorB.x,
+            ib * ib * anchorA.y + 2 * ib * b * corridorV.y + b * b * anchorB.y,
+            ib * ib * anchorA.z + 2 * ib * b * corridorV.z + b * b * anchorB.z,
+          );
+        } else {
+          c.position.lerpVectors(anchorA, anchorB, b);
+          // arc over the magazine rim
+          c.position.y += Math.sin(b * Math.PI) * 0.35;
+        }
         c.rotation.y = THREE.MathUtils.lerp(anchorYaw(fromA), anchorYaw(toA), b);
       }
     }
@@ -472,6 +519,15 @@ export function createWorld(canvas) {
   }));
   splash.scale.set(4, 1.2, 1);
   scene.add(splash);
+
+  // permanent scorched patch under the engine after touchdown
+  const scorch = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeGlowTexture(), color: 0x0b0a08, transparent: true, opacity: 0,
+    depthWrite: false,
+  }));
+  scorch.scale.set(7.5, 7.5, 1);
+  scorch.position.set(SITES.lander.x, terrainHeight(SITES.lander.x, SITES.lander.z) + 0.3, SITES.lander.z);
+  scene.add(scorch);
 
   const dust = new THREE.Sprite(new THREE.SpriteMaterial({
     map: glowTex, color: 0xa89f8e, transparent: true, opacity: 0,
@@ -553,7 +609,7 @@ export function createWorld(canvas) {
     cartDisplay.userData.led.emissiveIntensity = glowI;
     cartDisplay.userData.window.emissiveIntensity = glowI;
 
-    scene.fog.density = 0.0045 + night * 0.002;
+    scene.fog.density = 0.0026 + night * 0.0013;
     renderer.toneMappingExposure = 1.02 + daylight * 0.16;
 
     return { el, daylight, night };
@@ -586,6 +642,8 @@ export function createWorld(canvas) {
 
   function render() {
     const t = clock.getElapsedTime();
+    const dt = Math.min(0.1, t - (render._lt ?? t));
+    render._lt = t;
     const fx = Math.sin(t * 0.32) * 0.12 * (1 + camState.shake);
     const fy = Math.sin(t * 0.21) * 0.07 * (1 + camState.shake);
     camera.position.set(camState.x + fx, camState.y + fy, camState.z);
@@ -621,7 +679,11 @@ export function createWorld(canvas) {
       const clearance = Math.max(0.25, nozzleY - 0.04);
       pl.grp.scale.set(flick, Math.min(1, clearance / pl.len), flick);
       const throttle = 0.82 + Math.sin(t * 53) * 0.1 + Math.sin(t * 131) * 0.08;
-      for (const m of pl.mats) m.opacity = m.userData.baseOp * on * throttle;
+      for (const m of pl.mats) m.opacity = Math.min(1, m.userData.baseOp * on * throttle);
+      // exhaust streams away from the nozzle at layer-specific speeds
+      pl.texs[0].offset.y += dt * 3.2;
+      pl.texs[1].offset.y += dt * 2.1;
+      pl.texs[2].offset.y += dt * 1.3;
       pl.glow.material.opacity = 0.95 * on * throttle;
       const near = THREE.MathUtils.clamp(1 - (nozzleY - 0.3) / 7, 0, 1);
       splash.material.opacity = 0.55 * on * near;
@@ -656,7 +718,7 @@ export function createWorld(canvas) {
     terrainHeight, SITES,
     actors: {
       epoc, oasys, cartridges, cartDisplay, plinth, lander, orbiter,
-      beam, streak, trail, streakCurve, trailPos, trailGeo, dust,
+      beam, streak, trail, streakCurve, trailPos, trailGeo, dust, scorch,
     },
   };
 }

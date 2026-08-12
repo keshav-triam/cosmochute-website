@@ -94,6 +94,31 @@ function meshWheel(r = 0.36, w = 0.26) {
   return g;
 }
 
+// ---------------- parabolic dish (solid lathe, feed horn) ----------------
+function makeDish(r = 0.2) {
+  const g = new THREE.Group();
+  const pts = [];
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14;
+    pts.push(new THREE.Vector2(0.012 + t * r, t * t * r * 0.6));
+  }
+  const bowl = new THREE.Mesh(new THREE.LatheGeometry(pts, 26), new THREE.MeshStandardMaterial({
+    map: T.paint, color: 0xf2efe8, metalness: 0.3, roughness: 0.4, side: THREE.DoubleSide,
+  }));
+  g.add(bowl);
+  const hub = cyl(r * 0.16, r * 0.2, r * 0.16, 10, mats.dark);
+  hub.position.y = -r * 0.05;
+  g.add(hub);
+  const feedArm = cyl(0.01, 0.01, r * 1.05, 6, mats.dark);
+  feedArm.position.y = r * 0.5;
+  g.add(feedArm);
+  const feed = cyl(0.02, 0.035, r * 0.22, 8, mats.alu);
+  feed.position.y = r * 1.02;
+  feed.rotation.x = Math.PI;
+  g.add(feed);
+  return g;
+}
+
 // ---------------- electronics greebles ----------------
 // scatters capacitors, chips, connectors, wire runs and heatsinks
 // over a w x d patch (local XZ plane, +y up). Deterministic per seed.
@@ -266,17 +291,17 @@ export function buildEpoc() {
     }
   }
 
-  // --- sensor mast ---
+  // --- sensor mast (kept clear of the arm's swing plane) ---
   const mast = cyl(0.04, 0.055, 1.05, 10, mats.alu);
-  mast.position.set(0.8, 1.7, 0.34);
+  mast.position.set(0.8, 1.7, -0.34);
   g.add(mast);
   const head = box(0.4, 0.17, 0.2, mats.dark);
-  head.position.set(0.8, 2.26, 0.34);
+  head.position.set(0.8, 2.26, -0.34);
   edges(head);
   g.add(head);
   for (const side of [-1, 1]) {
     const eye = new THREE.Mesh(new THREE.CircleGeometry(0.045, 12), makeGlowMat(CYAN, 0x0a1418));
-    eye.position.set(0.985, 2.26, 0.34 + side * 0.09);
+    eye.position.set(0.985, 2.26, -0.34 + side * 0.09);
     eye.rotation.y = Math.PI / 2;
     glows.push(eye.material);
     g.add(eye);
@@ -286,10 +311,10 @@ export function buildEpoc() {
   const dishArm = cyl(0.02, 0.02, 0.4, 6, mats.alu);
   dishArm.position.set(-0.95, 1.55, -0.4);
   g.add(dishArm);
-  const dish = new THREE.Mesh(
-    new THREE.SphereGeometry(0.19, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2.6), mats.body);
-  dish.position.set(-0.95, 1.78, -0.4);
-  dish.rotation.x = -Math.PI / 3;
+  const dish = makeDish(0.21);
+  dish.position.set(-0.95, 1.76, -0.4);
+  dish.rotation.x = -0.7;
+  dish.rotation.z = 0.25;
   g.add(dish);
   const dishTip = new THREE.Object3D();
   dishTip.position.set(-0.95, 1.85, -0.4);
@@ -334,8 +359,15 @@ export function buildEpoc() {
   fore.rotation.z = 2.6;
 
   // --- lights ---
+  // beacon mast: the light sits ON something, not in mid-air
+  const beaconPole = cyl(0.018, 0.022, 0.36, 8, mats.alu);
+  beaconPole.position.set(-0.45, 1.82, -0.35);
+  g.add(beaconPole);
+  const beaconCap = cyl(0.05, 0.05, 0.025, 10, mats.dark);
+  beaconCap.position.set(-0.45, 2.0, -0.35);
+  g.add(beaconCap);
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 10), makeGlowMat(ACCENT));
-  beacon.position.set(-1.0, 1.68, 0.45);
+  beacon.position.set(-0.45, 2.04, -0.35);
   glows.push(beacon.material);
   g.add(beacon);
   for (const side of [-1, 1]) {
@@ -546,11 +578,40 @@ export function buildLander() {
   const plumeGrp = new THREE.Group();
   plumeGrp.position.y = 0.16;
   const plumeMats = [];
-  const plumeLayer = (r, len, baseOp, color) => {
+  const plumeTexs = [];
+  // streaming-exhaust texture: bright streaks born at the nozzle racing
+  // down the cone — scrolled per-layer at different speeds in render()
+  function makeFlameTexture(seed, streaks) {
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 64, 256);
+    let s = seed;
+    const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    for (let i = 0; i < streaks; i++) {
+      const x = rnd() * 64;
+      const wdt = 1 + rnd() * 2.5;
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      const a = 0.35 + rnd() * 0.5;
+      grad.addColorStop(0, `rgba(255,255,255,${a})`);
+      grad.addColorStop(0.5, `rgba(255,255,255,${a * 0.45})`);
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, 0, wdt, 256);
+      if (x + wdt > 64) ctx.fillRect(x - 64, 0, wdt, 256); // wrap seam
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  }
+  const plumeLayer = (r, len, baseOp, color, seed, streaks) => {
     const geo = new THREE.ConeGeometry(r, len, 18, 1, true);
     geo.translate(0, -len / 2, 0); // apex at origin, cone opens downward
+    const tex = makeFlameTexture(seed, streaks);
+    plumeTexs.push(tex);
     const m = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0,
+      color, map: tex, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false,
       side: THREE.DoubleSide, fog: false,
     });
@@ -558,9 +619,9 @@ export function buildLander() {
     plumeMats.push(m);
     plumeGrp.add(new THREE.Mesh(geo, m));
   };
-  plumeLayer(0.3, 2.6, 1.0, 0xfff4da);   // core
-  plumeLayer(0.72, 3.2, 0.38, 0xffc27a); // sheath
-  plumeLayer(1.55, 3.0, 0.14, 0x8fa8ff); // expansion haze
+  plumeLayer(0.3, 2.6, 1.35, 0xfff4da, 11, 22);   // core
+  plumeLayer(0.72, 3.2, 0.55, 0xffc27a, 47, 14);  // sheath
+  plumeLayer(1.55, 3.0, 0.22, 0x8fa8ff, 83, 9);   // expansion haze
   const glowCanvas = document.createElement('canvas');
   glowCanvas.width = glowCanvas.height = 64;
   const gctx = glowCanvas.getContext('2d');
@@ -631,11 +692,10 @@ export function buildLander() {
   const dishArm = cyl(0.035, 0.035, 0.75, 8, mats.alu);
   dishArm.position.set(1.3, DECK_Y + 0.38, -2.2);
   g.add(dishArm);
-  const dishL = new THREE.Mesh(
-    new THREE.SphereGeometry(0.42, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2.5), mats.body);
+  const dishL = makeDish(0.44);
   dishL.position.set(1.3, DECK_Y + 0.78, -2.2);
-  dishL.rotation.x = -Math.PI / 2.6;
-  dishL.rotation.z = 0.4;
+  dishL.rotation.x = -0.85;
+  dishL.rotation.z = 0.35;
   g.add(dishL);
   // deck utility electronics
   const deckElecL = greebleCluster(67, 1.4, 0.8);
@@ -683,7 +743,7 @@ export function buildLander() {
   plumeGrp.traverse((o) => { o.castShadow = o.receiveShadow = false; });
   g.userData = {
     glows, lamp: new THREE.PointLight(0, 0, 0), ramp: rampRoot, engineGlow,
-    plume: { grp: plumeGrp, mats: plumeMats, glow: nozzleGlow, state: { on: 0 }, len: 3.2 },
+    plume: { grp: plumeGrp, mats: plumeMats, texs: plumeTexs, glow: nozzleGlow, state: { on: 0 }, len: 3.2 },
     deckY: DECK_Y,
   };
   g.userData.lamp.intensity = 0; // interface parity with other machines
@@ -701,9 +761,8 @@ export function buildOrbiter() {
     panel.position.x = s * 3.0;
     g.add(panel);
   }
-  const dish = new THREE.Mesh(
-    new THREE.SphereGeometry(0.85, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2.4), mats.body);
-  dish.position.y = -0.9;
+  const dish = makeDish(0.85);
+  dish.position.y = -0.75;
   dish.rotation.x = Math.PI;
   g.add(dish);
   const led = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), makeGlowMat(CYAN));
