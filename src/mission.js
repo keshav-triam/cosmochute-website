@@ -96,7 +96,7 @@ export function buildMission(world, gsap, tl) {
   // grouser bites. UV-mapped to the same regolith texture as the ground
   // so the soil reads continuous; the geometry does the depressing.
   const rutMat = new THREE.MeshStandardMaterial({
-    map: TEX.regolithRim, color: 0xb2aa9c, roughness: 1, metalness: 0,
+    map: TEX.regolithRim, color: 0x877f72, roughness: 1, metalness: 0,
     polygonOffset: true, polygonOffsetFactor: -2,
   });
   const TRACK_GAUGE = 0.78;
@@ -506,13 +506,15 @@ export function buildMission(world, gsap, tl) {
   // S2 — LANDING
   // ============================================================
   card(1, T.s2 + 0.06, T.s3 - 0.14);
-  cam(T.s2, 0.35, { x: -27, y: 2.8, z: 3, tx: SITES.lander.x, ty: 3, tz: SITES.lander.z });
+  cam(T.s2, 0.35, { x: -29, y: 3.2, z: 4, tx: SITES.lander.x, ty: 42, tz: SITES.lander.z });
   tl.to(cs, { shake: 0.9, duration: 0.3 }, T.s2 + 0.45);
-  // the whole stack descends as one: lander + stowed EPOC + stowed OASys
+  // the whole stack descends as one: lander + stowed EPOC + stowed OASys —
+  // and the camera pans down WITH it, keeping the burn in frame
+  tl.to(cs, { ty: 3, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
   tl.to(lander.position, { y: landerY, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
   tl.to(epoc.position, { y: deckTop, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
   tl.to(oasys.position, { y: deckTop, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
-  tl.fromTo(lander.userData.engineGlow, { intensity: 0 }, { intensity: 26, duration: 0.5, ease: 'power1.in', immediateRender: false }, T.s2 + 0.15);
+  tl.fromTo(lander.userData.engineGlow, { intensity: 0 }, { intensity: 14, duration: 0.5, ease: 'power1.in', immediateRender: false }, T.s2 + 0.15);
   tl.to(lander.userData.engineGlow, { intensity: 0, duration: 0.18 }, T.s2 + 0.85);
   // descent plume throttles up, cuts hard at touchdown (scene.js renders
   // the layered cones, flicker, ground clamping and the surface splash)
@@ -546,6 +548,9 @@ export function buildMission(world, gsap, tl) {
   // ============================================================
   card(3, T.s4 + 0.06, T.s5 - 0.14);
   cam(T.s4, 0.3, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
+  // work lights on: the pick area is deliberately lit
+  tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s4 + 0.02);
+  tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s4 + 0.94);
   // the arm swings over the magazine and hovers above the cartridge…
   armPose(T.s4 + 0.04, 0.16, HOVER_A);
   // …lowers straight onto it…
@@ -585,6 +590,7 @@ export function buildMission(world, gsap, tl) {
   // the IK poses only line up with the magazine from this heading
   noteArrival(m1r);
   turnTo(T.s5 + 0.56, 0.1, epocPickHeading);
+  tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s5 + 0.55);
   cam(T.s5 + 0.56, 0.2, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
   // the arm collects the spent cartridge at the chamber…
   armPose(T.s5 + 0.68, 0.12, POSE_BELLY);
@@ -603,6 +609,7 @@ export function buildMission(world, gsap, tl) {
   card(5, T.s6 + 0.06, T.s7 - 0.14);
   // the second pick gets the same full, deliberate treatment as the
   // first — and the camera stays close to watch it
+  tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s6 + 0.85);
   armPose(T.s6 + 0.02, 0.1, HOVER_B);
   armPose(T.s6 + 0.14, 0.07, GRAB_B);
   carry(cartridges[CART_B], 'slot', 'wrist', T.s6 + 0.22, 0.06);
@@ -630,6 +637,8 @@ export function buildMission(world, gsap, tl) {
   // back from the last sortie: line up with the magazine one final time
   noteArrival(m2r);
   turnTo(T.s7 + 0.02, 0.1, epocPickHeading);
+  tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s7 + 0.04);
+  tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s7 + 0.82);
   cam(T.s7 + 0.02, 0.2, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
   // the last cartridge is lifted out of the belly and racked home
   armPose(T.s7 + 0.14, 0.12, POSE_BELLY);

@@ -128,7 +128,7 @@ export function createWorld(canvas) {
   ));
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight), 0.32, 0.55, 0.85);
+    new THREE.Vector2(window.innerWidth, window.innerHeight), 0.26, 0.5, 0.92);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
@@ -476,7 +476,7 @@ export function createWorld(canvas) {
 
   // relay orbiter, drifting across the sky
   const orbiter = buildOrbiter();
-  orbiter.scale.setScalar(2.2);
+  orbiter.scale.setScalar(1.7);
   scene.add(orbiter);
 
   // downlink beam (EPOC dish -> orbiter), shown during operations
@@ -653,9 +653,10 @@ export function createWorld(canvas) {
     earth.rotation.y = t * 0.02;
     stars.rotation.y = t * 0.004;
 
-    // relay orbiter: slow pass across the sky
-    const oa = t * 0.05;
-    orbiter.position.set(Math.cos(oa) * 240, 150 + Math.sin(oa * 0.7) * 20, Math.sin(oa) * 240 - 60);
+    // relay orbiter: distant satellite arc — far enough to read as a
+    // glint crossing the sky, never a floating billboard
+    const oa = t * 0.04;
+    orbiter.position.set(Math.cos(oa) * 520, 300 + Math.sin(oa * 0.7) * 30, Math.sin(oa) * 520 - 80);
     orbiter.rotation.y = oa + Math.PI / 2;
 
     // downlink beam follows EPOC dish and the orbiter

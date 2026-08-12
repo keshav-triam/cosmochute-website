@@ -305,9 +305,9 @@ function recomputePhaseKeys() {
     [thesisTop + (stackStart - thesisTop) * 0.6, -14],
     [stackEnd, -16],
     [cycleMid, -5],
-    [missionStart, 7],
-    [Math.min(1, missionStart + 0.08), 20],
-    [1, 45],
+    [missionStart, 12],
+    [Math.min(1, missionStart + 0.07), 34],
+    [1, 52],
   ]);
   bands = {
     duskFrom: (problemTop + thesisTop) / 2,

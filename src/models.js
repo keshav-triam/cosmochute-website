@@ -35,7 +35,7 @@ export const mats = {
   pcb: new THREE.MeshStandardMaterial({ color: 0x1e3a2a, metalness: 0.2, roughness: 0.6 }),
   capSilver: new THREE.MeshStandardMaterial({ color: 0xc8cbd2, metalness: 0.9, roughness: 0.25 }),
 };
-const edgeMat = new THREE.LineBasicMaterial({ color: 0x4a4b50, transparent: true, opacity: 0.3 });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x3c3d42, transparent: true, opacity: 0.12 });
 
 export function makeGlowMat(color, base = 0x111111) {
   return new THREE.MeshStandardMaterial({
@@ -192,7 +192,7 @@ export const CART_W = 0.52, CART_H = 0.17, CART_D = 0.30;
 export function buildCartridge(idx = 0) {
   const g = new THREE.Group();
   const bodyC = box(CART_W, CART_H, CART_D, mats.black);
-  edges(bodyC, new THREE.LineBasicMaterial({ color: 0x777a80, transparent: true, opacity: 0.55 }));
+  edges(bodyC, new THREE.LineBasicMaterial({ color: 0x55575c, transparent: true, opacity: 0.2 }));
   g.add(bodyC);
   // top regolith hatch
   const hatch = box(CART_W * 0.42, 0.012, CART_D * 0.6, mats.dark);
@@ -292,7 +292,7 @@ export function buildEpoc() {
   }
 
   // --- sensor mast (kept clear of the arm's swing plane) ---
-  const mast = cyl(0.04, 0.055, 1.05, 10, mats.alu);
+  const mast = cyl(0.06, 0.08, 1.05, 10, mats.alu);
   mast.position.set(0.8, 1.7, -0.34);
   g.add(mast);
   const head = box(0.4, 0.17, 0.2, mats.dark);
@@ -528,7 +528,7 @@ export function buildLander() {
     const panel = box(2.42, 1.34, 0.03, i % 2 ? mats.mli : mats.body);
     panel.position.set(Math.cos(a) * (BODY_R - 0.01), DECK_Y - 0.76, Math.sin(a) * (BODY_R - 0.01));
     panel.rotation.y = -a + Math.PI / 2;
-    edges(panel, new THREE.LineBasicMaterial({ color: 0x86837c, transparent: true, opacity: 0.5 }));
+    edges(panel, new THREE.LineBasicMaterial({ color: 0x5a5751, transparent: true, opacity: 0.2 }));
     g.add(panel);
   }
   const deck = new THREE.Mesh(new THREE.CylinderGeometry(BODY_R, BODY_R, 0.09, 8), mats.body);
@@ -719,7 +719,7 @@ export function buildLander() {
   rampRoot.position.set(BODY_R, DECK_Y, 0);
   const rampLen = 6.0;
   for (const side of [-1, 1]) {
-    const rail = box(rampLen, 0.08, 0.1, mats.alu);
+    const rail = box(rampLen, 0.08, 0.1, mats.body);
     rail.position.set(rampLen / 2 - 0.05, 0, side * 0.85);
     rampRoot.add(rail);
   }
@@ -727,7 +727,7 @@ export function buildLander() {
   plate.position.set(rampLen / 2 - 0.05, -0.02, 0);
   rampRoot.add(plate);
   for (let i = 0; i < 8; i++) {
-    const rung = box(0.06, 0.05, 1.7, mats.alu);
+    const rung = box(0.06, 0.05, 1.7, mats.dark);
     rung.position.set(0.35 + i * 0.72, 0.02, 0);
     rampRoot.add(rung);
   }
@@ -735,7 +735,7 @@ export function buildLander() {
   g.add(rampRoot);
 
   // engine glow (descent)
-  const engineGlow = new THREE.PointLight(0xffc87a, 0, 22, 2);
+  const engineGlow = new THREE.PointLight(0xffc87a, 0, 18, 2);
   engineGlow.position.y = 0.5;
   g.add(engineGlow);
 
