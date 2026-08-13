@@ -610,7 +610,7 @@ export function buildEpoc() {
     glows, lamp, wheels, wheelR,
     arm: { root: armRoot, upper, fore, wristTip, lengths: { l1: ARM_L1, l2: ARM_L2 } },
     payloadLid: lidGrp,
-    bellyAnchor, dishTip,
+    bellyAnchor, dishTip, dish,
   };
   return g;
 }
@@ -983,6 +983,7 @@ export function buildLander() {
     plume: { grp: plumeGrp, mats: plumeMats, texs: plumeTexs, glow: nozzleGlow, state: { on: 0 }, len: 3.2 },
     clamps,
     deckY: DECK_Y,
+    dish: dishL,
   };
   g.userData.lamp.intensity = 0; // interface parity with other machines
   g.add(g.userData.lamp);

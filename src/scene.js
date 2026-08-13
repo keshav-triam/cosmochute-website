@@ -418,25 +418,63 @@ export function createWorld(canvas) {
     }
     return out;
   }
-  function anchorYaw(name) {
-    return name === 'slot' ? oasys.rotation.y : epoc.rotation.y;
+  // full anchor attitude: a cart racked in the magazine tilts WITH the
+  // trailer on slopes, a bayed cart tilts with the rover — floating
+  // axis-aligned in a rolling body is what reads as fake
+  function anchorRot(name, out) {
+    const src = name === 'slot' ? oasys : epoc;
+    out.x = name === 'wrist' ? 0 : src.rotation.x;
+    out.y = src.rotation.y;
+    out.z = name === 'wrist' ? 0 : src.rotation.z;
+    return out;
   }
+  const rotA = new THREE.Euler(), rotB = new THREE.Euler();
   function glueCartridges() {
     for (const c of cartridges) {
       const { fromA, toA } = c.userData;
+      let wristness = 0;
       if (fromA === toA) {
         anchorPos(c, fromA, c.position);
-        c.rotation.y = anchorYaw(fromA);
+        anchorRot(fromA, c.rotation);
+        wristness = fromA === 'wrist' ? 1 : 0;
       } else {
         const b = THREE.MathUtils.smoothstep(c.userData.blend, 0, 1);
         anchorPos(c, fromA, anchorA);
         anchorPos(c, toA, anchorB);
-        c.position.lerpVectors(anchorA, anchorB, b);
-        // small arc: over the magazine rim on slot transfers, a gentle
-        // settle into the top-loading bay on seat transfers
-        const lift = (fromA === 'slot' || toA === 'slot') ? 0.35 : 0.05;
-        c.position.y += Math.sin(b * Math.PI) * lift;
-        c.rotation.y = THREE.MathUtils.lerp(anchorYaw(fromA), anchorYaw(toA), b);
+        // seating into the bay settles with weight (accelerating drop);
+        // everything else eases symmetrically
+        const bp = (toA === 'belly') ? b * b : b;
+        c.position.lerpVectors(anchorA, anchorB, bp);
+        // arc height scales with the REAL gap being crossed — the arm
+        // now latches dead-on the cartridge, so a fixed-height arc
+        // made the payload hop on its own at every grab
+        const maxLift = (fromA === 'slot' || toA === 'slot') ? 0.35 : 0.05;
+        c.position.y += Math.sin(b * Math.PI) * Math.min(maxLift, anchorA.distanceTo(anchorB) * 0.45);
+        anchorRot(fromA, rotA);
+        anchorRot(toA, rotB);
+        c.rotation.x = THREE.MathUtils.lerp(rotA.x, rotB.x, b);
+        c.rotation.y = THREE.MathUtils.lerp(rotA.y, rotB.y, b);
+        c.rotation.z = THREE.MathUtils.lerp(rotA.z, rotB.z, b);
+        wristness = fromA === 'wrist' ? 1 - b : (toA === 'wrist' ? b : 0);
+      }
+      // cosmetic pendulum: a payload on the grapple lags the gripper's
+      // motion — tilt away from the wrist's horizontal velocity, then
+      // settle. Damped garnish that dies to zero at rest, so parked
+      // frames stay exactly deterministic.
+      let sw = c.userData.sway;
+      if (!sw) sw = c.userData.sway = { x: 0, z: 0, px: 0, pz: 0, has: false };
+      if (wristness > 0.01) {
+        let vx = 0, vz = 0;
+        if (sw.has) { vx = c.position.x - sw.px; vz = c.position.z - sw.pz; }
+        sw.px = c.position.x; sw.pz = c.position.z; sw.has = true;
+        const tx = THREE.MathUtils.clamp(vz * 2.4, -0.13, 0.13);
+        const tz = THREE.MathUtils.clamp(-vx * 2.4, -0.13, 0.13);
+        sw.x += (tx - sw.x) * 0.16;
+        sw.z += (tz - sw.z) * 0.16;
+        c.rotation.x += sw.x * wristness;
+        c.rotation.z += sw.z * wristness;
+      } else {
+        sw.x *= 0.8; sw.z *= 0.8; sw.has = false;
       }
     }
   }
@@ -613,6 +651,8 @@ export function createWorld(canvas) {
   const lookTarget = new THREE.Vector3();
   const clock = new THREE.Clock();
   const dishWorld = new THREE.Vector3();
+  const dishAimV = new THREE.Vector3();
+  const DISH_UP = new THREE.Vector3(0, 1, 0);
 
   function render() {
     const t = clock.getElapsedTime();
@@ -632,6 +672,19 @@ export function createWorld(canvas) {
     const oa = t * 0.04;
     orbiter.position.set(Math.cos(oa) * 520, 300 + Math.sin(oa * 0.7) * 30, Math.sin(oa) * 520 - 80);
     orbiter.rotation.y = oa + Math.PI / 2;
+
+    // the high-gain dishes physically TRACK the relay as it crosses the
+    // sky (the beam already did; a dish frozen mid-mount while its own
+    // uplink slews is a continuity error). Bowl opens along local +Y.
+    for (const owner of [epoc, lander]) {
+      const d = owner.userData.dish;
+      if (!d) continue;
+      owner.updateWorldMatrix(true, false);
+      dishAimV.copy(orbiter.position);
+      owner.worldToLocal(dishAimV);
+      dishAimV.sub(d.position).normalize();
+      d.quaternion.setFromUnitVectors(DISH_UP, dishAimV);
+    }
 
     // downlink beam follows EPOC dish and the orbiter
     if (beam.material.opacity > 0.01) {

@@ -555,20 +555,20 @@ export function buildMission(world, gsap, tl) {
   }, [], T.s1 + 0.004);
   cam(T.s1 + 0.01, 0.42, { x: -2, y: 2.2, z: 16, tx: -120, ty: 150, tz: -320 });
   // while the camera is skyward, quietly stage the actors:
-  tl.set(lander.position, { x: SITES.lander.x, y: landerY + 55, z: SITES.lander.z, immediateRender: false }, T.s1 + 0.06);
-  tl.set(lander.rotation, { y: LANDER_HEADING, immediateRender: false }, T.s1 + 0.06);
+  tl.set(lander.position, { x: SITES.lander.x, y: landerY + 55, z: SITES.lander.z, immediateRender: false }, T.s2 - 0.12);
+  tl.set(lander.rotation, { y: LANDER_HEADING, immediateRender: false }, T.s2 - 0.12);
   // stow the convoy on the lander deck — IN THE SKY with the lander;
   // the descent tweens below fly the whole stack down together
   const STOW_ALT = 55;
   const stowE = egress.getPointAt(HITCH / egress.getLength());
   const stowO = egress.getPointAt(0);
-  tl.set(epoc.position, { x: stowE.x, y: deckTop + STOW_ALT, z: stowE.z, immediateRender: false }, T.s1 + 0.06);
-  tl.set(epoc.rotation, { y: LANDER_HEADING, z: 0, immediateRender: false }, T.s1 + 0.06);
-  tl.set(oasys.position, { x: stowO.x, y: deckTop + STOW_ALT, z: stowO.z, immediateRender: false }, T.s1 + 0.06);
-  tl.set(oasys.rotation, { y: LANDER_HEADING, z: 0, immediateRender: false }, T.s1 + 0.06);
+  tl.set(epoc.position, { x: stowE.x, y: deckTop + STOW_ALT, z: stowE.z, immediateRender: false }, T.s2 - 0.12);
+  tl.set(epoc.rotation, { y: LANDER_HEADING, z: 0, immediateRender: false }, T.s2 - 0.12);
+  tl.set(oasys.position, { x: stowO.x, y: deckTop + STOW_ALT, z: stowO.z, immediateRender: false }, T.s2 - 0.12);
+  tl.set(oasys.rotation, { y: LANDER_HEADING, z: 0, immediateRender: false }, T.s2 - 0.12);
   // launch latches close over the wheels for the ride down
   for (const cl of lander.userData.clamps) {
-    tl.set(cl.grp.rotation, { x: 0, immediateRender: false }, T.s1 + 0.06);
+    tl.set(cl.grp.rotation, { x: 0, immediateRender: false }, T.s2 - 0.12);
   }
   // launch streak from Earth
   const streakProxy = { p: 0 };
@@ -619,7 +619,8 @@ export function buildMission(world, gsap, tl) {
   tl.fromTo(lander.userData.plume.state, { on: 0 }, { on: 1, duration: 0.45, ease: 'power1.in', immediateRender: false }, T.s2 + 0.15);
   tl.to(lander.userData.plume.state, { on: 0, duration: 0.08 }, T.s2 + 0.84);
   // dust at touchdown
-  tl.set(dust.material, { opacity: 0.55, immediateRender: false }, T.s2 + 0.8);
+  // quick RAMP, not an instant set — a one-frame pop reads as a cut
+  tl.fromTo(dust.material, { opacity: 0 }, { opacity: 0.55, duration: 0.04, immediateRender: false }, T.s2 + 0.8);
   tl.set(dust.scale, { x: 2, y: 0.7, immediateRender: false }, T.s2 + 0.8);
   tl.to(dust.scale, { x: 22, y: 5, duration: 0.5, ease: 'power2.out' }, T.s2 + 0.82);
   tl.to(dust.material, { opacity: 0, duration: 0.45, ease: 'power1.out' }, T.s2 + 0.86);
