@@ -364,22 +364,134 @@ export function buildMission(world, gsap, tl) {
           const pBack = proxy.p - ((opts.tow || opts.oasysFollow) ? hitchFrac : 0);
           updateDustTrail(curve, pBack, 0, len, opts.surfaceY || terrainHeight);
         }
-        if (opts.followTarget) {
-          curve.getPointAt(Math.min(1, proxy.p + 0.04), pt);
-          cs.tx = pt.x;
-          cs.ty = (opts.surfaceY || terrainHeight)(pt.x, pt.z) + 1.0;
-          cs.tz = pt.z;
-        }
+        // (gaze during drives is handled by the camera rail's
+        // follow-weight channel — drives never touch the camera)
       },
     }, at);
     epocDistBase += len * (1 - p0);
     if (opts.tow || opts.oasysFollow) oasysDistBase += len * (1 - p0);
   }
 
-  // camera pose tween
-  function cam(at, dur, pose) {
-    tl.to(cs, { ...pose, duration: dur, ease: 'power1.inOut' }, at);
+  // ============================================================
+  // ONE CONTINUOUS CAMERA RAIL — the whole mission is a single
+  // C1-smooth dolly move. Position, gaze and follow-weight are
+  // cubic-keyframed channels evaluated from one scrubbed proxy:
+  // the camera never parks-and-jumps between shots, it FLOWS
+  // through them (holds are soft dwells with a living drift), and
+  // the gaze BLENDS between authored targets and the live convoy
+  // instead of separate tweens fighting over it.
+  // ============================================================
+  // monotone cubic (Fritsch–Butland) keyframe channels — Catmull-Rom
+  // tangents overshoot after big moves (the gaze sailed PAST the lander
+  // and stared at empty sky); monotone tangents can never overshoot a
+  // key, so the rail arrives at every vantage and STOPS there
+  const chan = (keys) => {
+    const n = keys.length, stride = keys[0].length - 1;
+    const ts = keys.map((k) => k[0]);
+    const vs = keys.map((k) => k.slice(1));
+    const ms = [];
+    for (let c = 0; c < stride; c++) {
+      const d = [], m = new Array(n);
+      for (let i = 0; i < n - 1; i++) d[i] = (vs[i + 1][c] - vs[i][c]) / (ts[i + 1] - ts[i]);
+      m[0] = d[0]; m[n - 1] = d[n - 2];
+      for (let i = 1; i < n - 1; i++) {
+        m[i] = (d[i - 1] * d[i] <= 0) ? 0 : 2 / (1 / d[i - 1] + 1 / d[i]);
+      }
+      ms.push(m);
+    }
+    const out = new Float64Array(stride);
+    return {
+      evaluate(tt) {
+        const tc = Math.max(ts[0], Math.min(ts[n - 1], tt));
+        let i = 0;
+        while (i < n - 2 && ts[i + 1] < tc) i++;
+        const h = ts[i + 1] - ts[i];
+        const s = (tc - ts[i]) / h;
+        const s2 = s * s, s3 = s2 * s;
+        const h00 = 2 * s3 - 3 * s2 + 1, h10 = s3 - 2 * s2 + s;
+        const h01 = -2 * s3 + 3 * s2, h11 = s3 - s2;
+        for (let c = 0; c < stride; c++) {
+          out[c] = h00 * vs[i][c] + h10 * h * ms[c][i] + h01 * vs[i + 1][c] + h11 * h * ms[c][i + 1];
+        }
+        return out;
+      },
+    };
+  };
+  const posRail = chan([
+    [0.0, -2.8, 2.15, 10.2],           // presky (journey A hands off here)
+    [0.45, -2, 2.2, 16],               // settled on the Earth view
+    [0.62, -2, 2.2, 16],
+    [1.15, -29, 3.2, 4],               // descent grandstand
+    [1.95, -29, 3.2, 4],
+    [2.4, -25, 2.3, 4],                // push in on the ramp
+    [2.55, -25, 2.3, 4],
+    [3.05, -14, 2.4, 6],               // travel with the egress
+    [3.45, -8.5, 1.9, 3.2],            // in beside the pick
+    [4.05, -8.5, 1.9, 3.2],
+    [4.65, 2.5, 3.4, -0.5],            // crane out with the departure
+    [4.98, 5, 2.4, -7],                // swap vantage
+    [6.45, 5, 2.4, -7],
+    [7.05, 9, 8.5, 9],                 // aerial over leg two
+    [7.75, 7.5, 2.4, 11],              // swoop to site two
+    [8.35, 7.5, 2.4, 11],
+    [8.75, 16, 3.4, 16],               // alongside the tow
+    [9.1, TH.x - 6, 4.5, TH.z + 10],   // around the rise for the unhitch
+    [9.6, TH.x - 6, 4.5, TH.z + 10],
+    [10.0, TH.x - 8, 6, TH.z + 13],    // final pull (journey B picks up here)
+  ]);
+  const tgtRail = chan([
+    [0.0, 1.2, 5, -3.5],               // presky gaze
+    [0.12, 107, 80, -366],             // same DIRECTION pushed far out — the
+    //                                    sweep to Earth runs at even angular
+    //                                    speed (near->far lookAt lerps whip)
+    [0.5, -120, 150, -320],            // Earth
+    [0.65, -120, 150, -320],
+    [1.3, SITES.lander.x, 58, SITES.lander.z],   // to the stack, hovering
+    [1.95, SITES.lander.x, 3, SITES.lander.z],   // tracked down to the pad
+    [2.15, SITES.lander.x + 2, 1.5, SITES.lander.z + 2],
+    [2.35, SITES.lander.x + 2, 1.5, SITES.lander.z + 2],
+    [3.5, B.x, 1, B.z],
+    [4.05, B.x, 1, B.z],
+    [4.9, D1.x, 1, D1.z],
+    [6.5, D1.x, 1, D1.z],
+    [7.35, D2.x, 1, D2.z],
+    [8.4, D2.x, 1, D2.z],
+    [9.05, TH.x + 10, 0.8, TH.z - 4],
+    [9.55, TH.x + 10, 0.8, TH.z - 4],
+    [10.0, TH.x + 22, 0.5, TH.z - 7],
+  ]);
+  const folRail = chan([
+    [0, 0], [2.25, 0], [2.5, 1], [3.1, 1], [3.4, 0],      // egress
+    [4.08, 0], [4.3, 1], [4.55, 1], [4.85, 0],            // first traverse
+    [6.5, 0], [6.72, 1], [7.15, 1], [7.45, 0],            // leg two
+    [8.35, 0], [8.55, 1], [8.88, 1],                      // the tow…
+    [9.12, 0.3], [9.4, 1], [9.6, 1], [9.85, 0], [10, 0],  // …dip, then the exit
+  ]);
+  const camT = { t: 0 };
+  function applyRail() {
+    const p = posRail.evaluate(camT.t);
+    cs.x = p[0]; cs.y = p[1]; cs.z = p[2];
+    const gz = tgtRail.evaluate(camT.t);
+    const fw = THREE.MathUtils.clamp(folRail.evaluate(camT.t)[0], 0, 1);
+    let tx = gz[0], ty = gz[1], tz = gz[2];
+    if (fw > 0.001) {
+      // live look-point: just ahead of EPOC, at deck height
+      const yaw = epoc.rotation.y;
+      tx += (epoc.position.x + Math.cos(yaw) * 1.2 - tx) * fw;
+      ty += (epoc.position.y + 1.0 - ty) * fw;
+      tz += (epoc.position.z - Math.sin(yaw) * 1.2 - tz) * fw;
+    }
+    // the gaze is a DIRECTION, not a point: renormalise the look-at to a
+    // fixed distance so angular speed stays even regardless of how near
+    // or far the authored targets sit (lerping a near lookAt point to a
+    // far one concentrates the whole rotation in a few frames)
+    const dx = tx - cs.x, dy = ty - cs.y, dz = tz - cs.z;
+    const L = Math.hypot(dx, dy, dz) || 1;
+    cs.tx = cs.x + (dx / L) * 60;
+    cs.ty = cs.y + (dy / L) * 60;
+    cs.tz = cs.z + (dz / L) * 60;
   }
+  tl.to(camT, { t: T.end, duration: T.end, ease: 'none', onUpdate: applyRail }, 0);
 
   // heading of a curve at parameter p (vehicle forward = local +x)
   const hTan = new THREE.Vector3();
@@ -542,18 +654,7 @@ export function buildMission(world, gsap, tl) {
   // S1 — INTEGRATION & LAUNCH
   // ============================================================
   card(0, T.s1 + 0.08, T.s2 - 0.14);
-  // before the sky pan, push the lookAt point far out along the CURRENT
-  // gaze — identical framing on screen, but the sweep to Earth then runs
-  // at even angular speed (lerping a near lookAt to a far one whips the
-  // gaze in the first few frames)
-  tl.call(() => {
-    const dx = cs.tx - cs.x, dy = cs.ty - cs.y, dz = cs.tz - cs.z;
-    const L = Math.hypot(dx, dy, dz) || 1;
-    cs.tx = cs.x + (dx / L) * 400;
-    cs.ty = cs.y + (dy / L) * 400;
-    cs.tz = cs.z + (dz / L) * 400;
-  }, [], T.s1 + 0.004);
-  cam(T.s1 + 0.01, 0.42, { x: -2, y: 2.2, z: 16, tx: -120, ty: 150, tz: -320 });
+  // (camera: the rail pans up from the presky gaze to Earth over S1)
   // while the camera is skyward, quietly stage the actors:
   tl.set(lander.position, { x: SITES.lander.x, y: landerY + 55, z: SITES.lander.z, immediateRender: false }, T.s2 - 0.12);
   tl.set(lander.rotation, { y: LANDER_HEADING, immediateRender: false }, T.s2 - 0.12);
@@ -595,20 +696,12 @@ export function buildMission(world, gsap, tl) {
   // S2 — LANDING
   // ============================================================
   card(1, T.s2 + 0.06, T.s3 - 0.14);
-  // BRIDGE from S1: the travel starts while the streak is still inbound,
-  // gliding toward the landing zone as the gaze descends from Earth to
-  // the stack hovering at stow altitude. ty runs on its OWN tween that
-  // ends before the descent-track tween begins — the two must never
-  // overlap: a timeline playing backward renders overlapping siblings
-  // in reverse order, so a same-property overlap snaps on reverse scroll
-  cam(T.s2 - 0.4, 0.68, { x: -29, y: 3.2, z: 4, tx: SITES.lander.x, tz: SITES.lander.z });
-  tl.to(cs, { ty: 58, duration: 0.41, ease: 'power1.inOut' }, T.s2 - 0.38);
+  // (camera: rail travels to the descent grandstand while the streak
+  // is inbound, gaze descending from Earth to the hovering stack)
   tl.to(cs, { shake: 0.9, duration: 0.3 }, T.s2 + 0.45);
   // the whole stack descends as one: lander + stowed EPOC + stowed OASys —
   // and the camera pans down WITH it, keeping the burn in frame
-  // inOut, not power2.in: the gaze FRAMES the fall (pad context below)
-  // rather than chasing the lander — chasing whips the tilt at touchdown
-  tl.to(cs, { ty: 3, duration: 0.78, ease: 'power1.inOut' }, T.s2 + 0.05);
+  // (camera: the rail's gaze channel tracks the descent down to the pad)
   tl.to(lander.position, { y: landerY, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
   tl.to(epoc.position, { y: deckTop, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
   tl.to(oasys.position, { y: deckTop, duration: 0.78, ease: 'power2.in' }, T.s2 + 0.05);
@@ -632,8 +725,6 @@ export function buildMission(world, gsap, tl) {
   // S3 — E1O1: EGRESS
   // ============================================================
   card(2, T.s3 + 0.06, T.s4 - 0.14);
-  // slow push-in that starts before the boundary — a settle, not a step
-  cam(T.s3 - 0.1, 0.45, { x: -25, y: 2.3, z: 4, tx: SITES.lander.x + 2, ty: 1.5, tz: SITES.lander.z + 2 });
   // launch latches swing open, releasing the convoy…
   lander.userData.clamps.forEach((cl, i) => {
     tl.to(cl.grp.rotation, { x: cl.openRot, duration: 0.14, ease: 'back.out(1.6)' }, T.s3 + 0.02 + i * 0.05);
@@ -645,15 +736,11 @@ export function buildMission(world, gsap, tl) {
     tow: true, fromHitch: true, surfaceY: egressSurfaceY, followTarget: true,
     ease: 'power1.inOut', dust: false,
   });
-  cam(T.s3 + 0.5, 0.5, { x: -14, y: 2.4, z: 6 });
 
   // ============================================================
   // S4 — FIRST MISSION
   // ============================================================
   card(3, T.s4 + 0.06, T.s5 - 0.14);
-  // BRIDGE from S3: the camera is already moving in beside the convoy as
-  // it parks — target hands over seamlessly from the drive's followTarget
-  cam(T.s4 - 0.13, 0.5, { x: -8.5, y: 1.9, z: 3.2, tx: B.x, ty: 1.0, tz: B.z });
   // work lights on: the pick area is deliberately lit
   tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s4 + 0.02);
   tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s4 + 0.94);
@@ -679,8 +766,6 @@ export function buildMission(world, gsap, tl) {
   // the whole train advances into the rough zone — trailer and all
   noteArrival(egress);
   turn(T.s4 + 0.9, 0.08, m1, HITCH / m1.getLength());
-  // long crane out ahead of the departing convoy — travels WITH the drive
-  cam(T.s4 + 0.85, 0.6, { x: 2.5, y: 3.4, z: -0.5 });
   drive(T.s4 + 1.0, 0.36, m1, ribbons.m1, { tow: true, fromHitch: true, followTarget: true });
   // operate: belly payload live, downlink to the relay orbiter
   lidOpen(T.s5 - 0.16, 0.08);
@@ -698,8 +783,6 @@ export function buildMission(world, gsap, tl) {
   // on the hook behind; nobody drives anywhere
   noteArrival(m1);
   tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s5 + 0.14);
-  // BRIDGE from S4: glide begins as the convoy is still rolling to a stop
-  cam(T.s5 - 0.05, 0.5, { x: 5, y: 2.4, z: -7, tx: D1.x, ty: 1.0, tz: D1.z });
   // lid opens; the arm lifts the spent cartridge out — attached all the way…
   lidOpen(T.s5 + 0.16, 0.1);
   armPose(T.s5 + 0.2, 0.1, BOX_HOVER);
@@ -733,12 +816,7 @@ export function buildMission(world, gsap, tl) {
   armPose(T.s6 + 0.4, 0.07, BOX_HOVER);
   lidClose(T.s6 + 0.48, 0.08);
   armPose(T.s6 + 0.48, 0.1, POSE_STOW);
-  // …and the convoy rolls ONWARD — never back — to crater site two.
-  // The crane up to the aerial starts early and rises through the drive
-  // start; position ONLY — the gaze belongs to the drive's followTarget
-  // the whole way (an explicit target tween here would overlap the
-  // follow-cam and snap on reverse scroll)
-  cam(T.s6 + 0.5, 0.55, { x: 9, y: 8.5, z: 9 });
+  // …and the convoy rolls ONWARD — never back — to crater site two
   noteArrival(m1);
   turn(T.s6 + 0.6, 0.06, leg2, HITCH / leg2.getLength());
   drive(T.s6 + 0.68, 0.54, leg2, ribbons.leg2, { tow: true, fromHitch: true, followTarget: true });
@@ -758,9 +836,6 @@ export function buildMission(world, gsap, tl) {
   noteArrival(leg2);
   tl.to(epoc.userData, { lampBoost: 2.4, duration: 0.1 }, T.s7 + 0.04);
   tl.to(epoc.userData, { lampBoost: 0, duration: 0.12 }, T.s7 + 0.82);
-  // BRIDGE from S6: swoop down from the aerial while the site-two beam
-  // is still firing — the descent IS the transition
-  cam(T.s7 - 0.12, 0.5, { x: 7.5, y: 2.4, z: 11, tx: D2.x, ty: 1.0, tz: D2.z });
   // the last cartridge comes out of the bay and is racked home
   lidOpen(T.s7 + 0.06, 0.1);
   armPose(T.s7 + 0.1, 0.1, BOX_HOVER);
@@ -775,7 +850,6 @@ export function buildMission(world, gsap, tl) {
   armPose(T.s7 + 0.7, 0.07, TB_S2.hover);
   armPose(T.s7 + 0.79, 0.1, POSE_STOW);
   // still hitched — onward again, the final tow to Trailer Heaven
-  cam(T.s7 + 0.9, 0.4, { x: 16, y: 3.4, z: 16 });
   turn(T.s7 + 0.9, 0.08, towCurve, HITCH / towCurve.getLength());
   drive(T.s7 + 1.02, 0.44, towCurve, ribbons.tow, {
     tow: true, fromHitch: true, followTarget: true,
@@ -788,18 +862,10 @@ export function buildMission(world, gsap, tl) {
   // ============================================================
   card(7, T.s8 + 0.06, null); // stays until the pin releases
   tl.to(tow.rotation, { z: 0.85, y: 0, duration: 0.1 }, T.s8 + 0.02);
-  // BRIDGE from S7: drift around the rise as the convoy parks, so the
-  // unhitch happens mid-glide. Starts just AFTER the tow drive ends —
-  // its target tween must not overlap the drive's followTarget
-  cam(T.s8 - 0.03, 0.44, {
-    x: TH.x - 6, y: 4.5, z: TH.z + 10,
-    tx: TH.x + 10, ty: 0.8, tz: TH.z - 4,
-  });
   noteArrival(towCurve);
   turn(T.s8 + 0.06, 0.1, exitCurve);
   drive(T.s8 + 0.18, 0.85, exitCurve, ribbons.exit, { ease: 'power1.in', followTarget: true });
-  // final pull-up as EPOC fades into the fog
-  cam(T.s8 + 0.7, 0.35, { x: TH.x - 8, y: 6, z: TH.z + 13, tx: TH.x + 22, ty: 0.5, tz: TH.z - 7 });
+  // (camera: the rail's final pull-up as EPOC fades into the fog)
   tl.to({}, { duration: 0.001 }, T.end - 0.001); // pad to full duration
 
   return { T, STAGE_STARTS };
