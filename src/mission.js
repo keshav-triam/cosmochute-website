@@ -199,23 +199,55 @@ export function buildMission(world, gsap, tl) {
 
   // ---------------- vehicle placement ----------------
   const pt = new THREE.Vector3(), tan = new THREE.Vector3();
+  // hull footprints (local: half-length along +x, half-width, underside
+  // height) for the body-corner clearance pass below
+  epoc.userData.footprint = { hl: 1.35, hw: 0.95, bottom: 0.4 };
+  oasys.userData.footprint = { hl: 1.3, hw: 0.74, bottom: 0.46 };
+  // damped body attitude from the local slope (pitch along the tangent,
+  // roll across it) — shared by live placement and the parked stop
+  // frames so the arm's IK sees the same body the renderer does
+  function groundAttitude(x, z, tx, tz, sf) {
+    const e = 0.7;
+    const hA = sf(x + tx * e, z + tz * e);
+    const hB = sf(x - tx * e, z - tz * e);
+    const rotZ = Math.atan2(hA - hB, 2 * e) * 0.75;
+    const sx = -tz, sz = tx;
+    const hL = sf(x + sx * e, z + sz * e);
+    const hR = sf(x - sx * e, z - sz * e);
+    const rotX = Math.atan2(hR - hL, 2 * e) * 0.55;
+    return { rotX, rotZ };
+  }
+  // the damping keeps hulls readable, but on rim cross-slopes it lets
+  // the uphill corner of a hull dig into the soil — lift the body until
+  // every footprint corner clears the ground beneath it (capped inside
+  // the suspension's travel so wheels stay planted)
+  const liftE = new THREE.Euler(), liftM = new THREE.Matrix4(), liftV = new THREE.Vector3();
+  function cornerLift(fp, x, z, baseY, rotX, yaw, rotZ, sf) {
+    if (!fp) return 0;
+    liftE.set(rotX, yaw, rotZ, 'XYZ');
+    liftM.makeRotationFromEuler(liftE);
+    let lift = 0;
+    for (let cu = -1; cu <= 1; cu += 2) {
+      for (let cv = -1; cv <= 1; cv += 2) {
+        liftV.set(cu * fp.hl, fp.bottom, cv * fp.hw).applyMatrix4(liftM);
+        const gy = sf(x + liftV.x, z + liftV.z);
+        lift = Math.max(lift, gy + 0.05 - (baseY + liftV.y));
+      }
+    }
+    return Math.min(lift, 0.18);
+  }
   function place(obj, curve, p, opts = {}) {
     curve.getPointAt(p, pt);
     curve.getTangentAt(p, tan);
     const sf = opts.surfaceY || terrainHeight;
+    const yaw = Math.atan2(-tan.z, tan.x);
+    const { rotX, rotZ } = groundAttitude(pt.x, pt.z, tan.x, tan.z, sf);
+    obj.rotation.y = yaw;
+    obj.rotation.z = rotZ;
+    obj.rotation.x = rotX;
     // small clearance lift keeps wheel rims out of the surface detail
-    obj.position.set(pt.x, sf(pt.x, pt.z) + 0.04, pt.z);
-    obj.rotation.y = Math.atan2(-tan.z, tan.x);
-    const e = 0.7;
-    // pitch from the slope along the tangent
-    const hA = sf(pt.x + tan.x * e, pt.z + tan.z * e);
-    const hB = sf(pt.x - tan.x * e, pt.z - tan.z * e);
-    obj.rotation.z = Math.atan2(hA - hB, 2 * e) * 0.75;
-    // roll from the side slope, so wheels sit on cross-slopes too
-    const sx = -tan.z, sz = tan.x;
-    const hL = sf(pt.x + sx * e, pt.z + sz * e);
-    const hR = sf(pt.x - sx * e, pt.z - sz * e);
-    obj.rotation.x = Math.atan2(hR - hL, 2 * e) * 0.55;
+    const baseY = sf(pt.x, pt.z) + 0.04;
+    obj.position.set(pt.x, baseY + cornerLift(obj.userData.footprint, pt.x, pt.z, baseY, rotX, yaw, rotZ, sf), pt.z);
     suspend(obj, sf);
   }
   function spinWheels(m, dist) {
@@ -425,16 +457,31 @@ export function buildMission(world, gsap, tl) {
   const UP = new THREE.Vector3(0, 1, 0);
   function stopFrame(curve) {
     const hf = HITCH / curve.getLength();
-    const eP = curve.getPointAt(1);
-    eP.y = terrainHeight(eP.x, eP.z) + 0.04;
-    const oP = curve.getPointAt(1 - hf);
-    oP.y = terrainHeight(oP.x, oP.z) + 0.04;
-    return { eH: heading(curve, 1), eP, oH: heading(curve, 1 - hf), oP };
+    // mirror place()'s ground math (attitude + corner-clearance lift) so
+    // the solved arm targets sit on the SAME body the renderer places
+    const stopPos = (p, fp) => {
+      const P = curve.getPointAt(p);
+      curve.getTangentAt(p, hTan);
+      const yaw = Math.atan2(-hTan.z, hTan.x);
+      const { rotX, rotZ } = groundAttitude(P.x, P.z, hTan.x, hTan.z, terrainHeight);
+      const baseY = terrainHeight(P.x, P.z) + 0.04;
+      P.y = baseY + cornerLift(fp, P.x, P.z, baseY, rotX, yaw, rotZ, terrainHeight);
+      // full attitude quaternion — on sloped stops pitch/roll displace
+      // the magazine slots enough that a yaw-only frame misses the pick
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotX, yaw, rotZ, 'XYZ'));
+      return { P, q };
+    };
+    const e = stopPos(1, epoc.userData.footprint);
+    const o = stopPos(1 - hf, oasys.userData.footprint);
+    return {
+      eH: heading(curve, 1), eP: e.P, eQ: e.q,
+      oH: heading(curve, 1 - hf), oP: o.P, oQ: o.q,
+    };
   }
   function slotInEpocAt(frame, slotIdx) {
     const sl = oasys.userData.slots[slotIdx].position.clone();
-    sl.applyAxisAngle(UP, frame.oH).add(frame.oP);   // -> world
-    sl.sub(frame.eP).applyAxisAngle(UP, -frame.eH);   // -> EPOC local
+    sl.applyQuaternion(frame.oQ).add(frame.oP);              // -> world
+    sl.sub(frame.eP).applyQuaternion(frame.eQ.clone().invert()); // -> EPOC local
     return sl;
   }
   // front-row slots nearest the arm — the only ones physically in reach.
