@@ -202,7 +202,9 @@ export function buildMission(world, gsap, tl) {
   // hull footprints (local: half-length along +x, half-width, underside
   // height) for the body-corner clearance pass below
   epoc.userData.footprint = { hl: 1.35, hw: 0.95, bottom: 0.4 };
-  oasys.userData.footprint = { hl: 1.3, hw: 0.74, bottom: 0.46 };
+  // bottom = the frame rails, the lowest fixed structure after the
+  // chassis upgrade (was the old bed underside at 0.46)
+  oasys.userData.footprint = { hl: 1.35, hw: 0.74, bottom: 0.37 };
   // damped body attitude from the local slope (pitch along the tangent,
   // roll across it) — shared by live placement and the parked stop
   // frames so the arm's IK sees the same body the renderer does

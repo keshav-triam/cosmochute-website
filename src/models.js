@@ -621,11 +621,33 @@ export function buildOasys() {
   const g = new THREE.Group();
   const glows = [];
 
-  // flatbed
-  const bed = box(2.5, 0.16, 1.4, mats.body);
-  bed.position.y = 0.56;
+  // --- layered chassis: exposed frame rails + cross-members under a
+  // skirted two-tone deck, same design language as EPOC ---
+  for (const rz of [-0.5, 0.5]) {
+    const rail = box(2.42, 0.1, 0.09, mats.alu);
+    rail.position.set(0, 0.42, rz);
+    g.add(rail);
+  }
+  for (const rx of [-0.9, 0, 0.9]) {
+    const xm = box(0.09, 0.08, 1.06, mats.dark);
+    xm.position.set(rx, 0.42, 0);
+    g.add(xm);
+  }
+  const skirt = box(2.56, 0.12, 1.46, mats.dark);
+  skirt.position.y = 0.5;
+  edges(skirt);
+  g.add(skirt);
+  const bed = box(2.5, 0.12, 1.4, mats.body);
+  bed.position.y = 0.6;
   edges(bed);
   g.add(bed);
+  // amber running lines along both deck flanks (EPOC's runLine idiom)
+  for (const rz of [-1, 1]) {
+    const run = box(2.3, 0.018, 0.018, makeGlowMat(ACCENT, 0x1a1206));
+    run.position.set(0, 0.635, rz * 0.705);
+    glows.push(run.material);
+    g.add(run);
+  }
 
   // open-top cartridge magazine
   const magW = 2.54, magH = 0.62, magD = 1.2, wall = 0.05;
@@ -658,6 +680,71 @@ export function buildOasys() {
     m.position.set(sx * magW / 2, magY + magH / 2, 0);
     g.add(m);
   }
+  // --- magazine superstructure (all OUTSIDE the mouth: the arm's pick
+  // clearance over the walls is untouched) ---
+  // gold-capped corner pillars
+  for (const px of [-1, 1]) {
+    for (const pz of [-1, 1]) {
+      const pillar = box(0.07, magH + 0.12, 0.07, mats.alu);
+      pillar.position.set(px * (magW / 2 + 0.02), magY + 0.02, pz * (magD / 2 + 0.02));
+      g.add(pillar);
+      const cap = box(0.09, 0.05, 0.09, mats.gold);
+      cap.position.set(px * (magW / 2 + 0.02), magY + magH / 2 + 0.1, pz * (magD / 2 + 0.02));
+      g.add(cap);
+    }
+  }
+  // exterior truss on both long walls: X-braces between stiffener ribs
+  for (const tz of [-1, 1]) {
+    const zc = tz * (magD / 2 + 0.03);
+    const rib = box(magW * 0.96, 0.04, 0.024, mats.alu);
+    rib.position.set(0, magY - magH / 2 + 0.08, zc);
+    g.add(rib);
+    for (let i = 0; i < 4; i++) {
+      const bx = -0.93 + i * 0.62;
+      for (const dr of [-1, 1]) {
+        const brace = box(0.56, 0.028, 0.02, mats.dark);
+        brace.position.set(bx, magY + 0.02, zc);
+        brace.rotation.z = dr * 0.72;
+        g.add(brace);
+      }
+    }
+    // slot-status LEDs above each column
+    for (let i = 0; i < 4; i++) {
+      const led = box(0.035, 0.02, 0.014, makeGlowMat(ACCENT, 0x1a1206));
+      led.position.set(-0.83 + i * 0.555, magY + magH / 2 + 0.045, zc + 0.014 * tz);
+      glows.push(led.material);
+      g.add(led);
+    }
+  }
+  // MLI thermal wrap on the front (hitch-side) end wall
+  const mliWrap = box(0.035, magH * 0.82, magD * 0.86, mats.mli);
+  mliWrap.position.set(magW / 2 + 0.035, magY, 0);
+  g.add(mliWrap);
+  // angled solar strip on the far-side wall, feeding the magazine bus
+  const solarStrip = box(1.55, 0.022, 0.3, mats.solar);
+  solarStrip.position.set(0.1, magY + magH / 2 + 0.12, -(magD / 2 + 0.16));
+  solarStrip.rotation.x = 0.62;
+  g.add(solarStrip);
+  const solarArmL = box(0.02, 0.16, 0.02, mats.alu);
+  solarArmL.position.set(-0.55, magY + magH / 2 + 0.05, -(magD / 2 + 0.1));
+  g.add(solarArmL);
+  const solarArmR = solarArmL.clone();
+  solarArmR.position.x = 0.75;
+  g.add(solarArmR);
+  // articulated work light on the rear-right pillar (the visible source
+  // of the send-off lampBoost glow)
+  const wlPost = cyl(0.018, 0.018, 0.42, 6, mats.dark);
+  wlPost.position.set(-(magW / 2 + 0.02), magY + magH / 2 + 0.3, magD / 2 + 0.02);
+  g.add(wlPost);
+  const wlHead = box(0.11, 0.055, 0.08, mats.alu);
+  wlHead.position.set(-(magW / 2 + 0.02) + 0.04, magY + magH / 2 + 0.5, magD / 2 + 0.02);
+  wlHead.rotation.z = -0.45;
+  g.add(wlHead);
+  const wlLens = box(0.07, 0.02, 0.055, makeGlowMat(ACCENT, 0x241a08));
+  wlLens.position.set(-(magW / 2 + 0.02) + 0.065, magY + magH / 2 + 0.47, magD / 2 + 0.02);
+  wlLens.rotation.z = -0.45;
+  glows.push(wlLens.material);
+  g.add(wlLens);
 
   // 8 slot anchors: 2 rows x 4, cartridge tops peeking above the rim
   const slots = [];
@@ -670,7 +757,7 @@ export function buildOasys() {
     }
   }
 
-  // 4 mesh wheels
+  // 4 mesh wheels under fender arches, on visible rocker links
   const wheels = [];
   const wheelR = 0.3;
   for (const side of [-1, 1]) {
@@ -679,18 +766,54 @@ export function buildOasys() {
       w.position.set(x, wheelR, side * 0.84);
       g.add(w);
       wheels.push(w);
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.036, 8, 14, Math.PI), mats.dark);
+      arch.position.set(x, wheelR + 0.04, side * 0.84);
+      g.add(arch);
+      const rocker = box(0.34, 0.045, 0.05, mats.alu);
+      rocker.position.set(x * 0.72, 0.4, side * 0.68);
+      rocker.rotation.y = side * x * 0.5;
+      rocker.rotation.z = -0.28 * Math.sign(x);
+      g.add(rocker);
     }
-    const skirt = box(1.9, 0.06, 0.06, mats.alu);
-    skirt.position.set(0, 0.48, side * 0.84);
-    g.add(skirt);
   }
+  // rear fascia: bumper beam, amber tail lights, aft hazcam, mudflaps
+  const bumper = box(0.08, 0.1, 1.3, mats.dark);
+  bumper.position.set(-1.3, 0.5, 0);
+  g.add(bumper);
+  for (const tz of [-1, 1]) {
+    const tail = box(0.02, 0.05, 0.09, makeGlowMat(ACCENT, 0x1a1206));
+    tail.position.set(-1.345, 0.5, tz * 0.56);
+    glows.push(tail.material);
+    g.add(tail);
+    const flap = box(0.02, 0.18, 0.2, mats.black);
+    flap.position.set(-1.06, 0.32, tz * 0.84);
+    g.add(flap);
+  }
+  const hazcam = box(0.09, 0.07, 0.07, mats.black);
+  hazcam.position.set(-1.33, 0.62, 0.18);
+  g.add(hazcam);
+  const hazLens = box(0.02, 0.03, 0.03, makeGlowMat(CYAN, 0x061214));
+  hazLens.position.set(-1.38, 0.62, 0.18);
+  glows.push(hazLens.material);
+  g.add(hazLens);
 
-  // tow bar (pivots up when unhitched)
+  // A-frame drawbar (pivots up when unhitched): twin angled struts with
+  // a damper, converging on the same gold hitch eye as before
   const towRoot = new THREE.Group();
   towRoot.position.set(1.28, 0.55, 0);
-  const bar = box(1.17, 0.06, 0.06, mats.gold);
+  const bar = box(1.17, 0.055, 0.055, mats.gold);
   bar.position.x = 0.585;
   towRoot.add(bar);
+  for (const az of [-1, 1]) {
+    const strut = box(1.1, 0.05, 0.05, mats.alu);
+    strut.position.set(0.5, -0.01, az * 0.16);
+    strut.rotation.y = -az * 0.3;
+    towRoot.add(strut);
+  }
+  const damper = cyl(0.028, 0.028, 0.4, 8, mats.dark);
+  damper.rotation.z = Math.PI / 2 - 0.25;
+  damper.position.set(0.32, 0.09, 0);
+  towRoot.add(damper);
   const eye = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.022, 8, 14), mats.gold);
   eye.rotation.x = Math.PI / 2;
   eye.position.x = 1.2;
@@ -715,9 +838,36 @@ export function buildOasys() {
   glows.push(beacon.material);
   g.add(beacon);
   const strip = box(magW * 0.95, 0.03, 0.02, makeGlowMat(CYAN, 0x0a1418));
-  strip.position.set(0, 0.62, 0.71);
+  strip.position.set(0, 0.545, 0.735);
   glows.push(strip.material);
   g.add(strip);
+  const strip2 = strip.clone();
+  strip2.position.z = -0.735;
+  g.add(strip2);
+
+  // unit wordmark on both flanks (EPOC's decal idiom)
+  const oCanvas = document.createElement('canvas');
+  oCanvas.width = 256; oCanvas.height = 64;
+  const octx = oCanvas.getContext('2d');
+  octx.fillStyle = '#7fd8e8';
+  octx.fillRect(6, 8, 10, 48);
+  octx.fillStyle = '#e8e5df';
+  octx.font = '700 40px Arial';
+  octx.fillText('OASYS-1', 28, 48);
+  octx.fillStyle = '#8e8b84';
+  octx.font = '700 14px Arial';
+  octx.fillText('COSMOCHUTE LEAP', 30, 60);
+  const oTex = new THREE.CanvasTexture(oCanvas);
+  oTex.colorSpace = THREE.SRGBColorSpace;
+  for (const side of [-1, 1]) {
+    const decal = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.125), new THREE.MeshStandardMaterial({
+      map: oTex, transparent: true, roughness: 0.6, metalness: 0.1,
+      polygonOffset: true, polygonOffsetFactor: -1,
+    }));
+    decal.position.set(0.55, 0.5, side * 0.732);
+    decal.rotation.y = side > 0 ? 0 : Math.PI;
+    g.add(decal);
+  }
 
   const lamp = new THREE.PointLight(CYAN, 0, 7, 2);
   lamp.position.set(0, 1.6, 0);
