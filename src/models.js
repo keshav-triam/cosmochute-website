@@ -225,6 +225,81 @@ export function buildCartridge(idx = 0) {
   return markShadows(g);
 }
 
+// ---------------- detail kit: engineering motifs shared by all hardware ----------------
+function conduit(pts, r = 0.016, mat = mats.dark) {
+  const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)));
+  return new THREE.Mesh(new THREE.TubeGeometry(curve, 20, r, 6), mat);
+}
+function boltRing(r, n = 8, mat = mats.capSilver) {
+  const grp = new THREE.Group();
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const b = cyl(0.013, 0.013, 0.022, 6, mat);
+    b.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+    grp.add(b);
+  }
+  return grp;
+}
+function handrail(len, h = 0.1, mat = mats.gold) {
+  const grp = new THREE.Group();
+  const top = cyl(0.012, 0.012, len, 6, mat);
+  top.rotation.z = Math.PI / 2;
+  top.position.y = h;
+  grp.add(top);
+  for (const s of [-1, 1]) {
+    const leg = cyl(0.012, 0.012, h, 6, mat);
+    leg.position.set(s * (len / 2 - 0.02), h / 2, 0);
+    grp.add(leg);
+  }
+  return grp;
+}
+function ventPanel(w, h, n = 5) {
+  const grp = new THREE.Group();
+  const back = box(w, h, 0.014, mats.black);
+  grp.add(back);
+  for (let i = 0; i < n; i++) {
+    const slat = box(w * 0.86, h / (n * 1.9), 0.02, mats.dark);
+    slat.position.set(0, -h / 2 + (i + 0.5) * (h / n), 0.012);
+    slat.rotation.x = 0.5;
+    grp.add(slat);
+  }
+  return grp;
+}
+function umbilicalPanel() {
+  const grp = new THREE.Group();
+  const plate = box(0.24, 0.16, 0.02, mats.alu);
+  grp.add(plate);
+  const colors = [0xcf9331, 0x7fd8e8, 0x33343a];
+  for (let i = 0; i < 3; i++) {
+    const port = cyl(0.028, 0.032, 0.035, 8, mats.dark);
+    port.rotation.x = Math.PI / 2;
+    port.position.set(-0.07 + i * 0.07, 0.02, 0.02);
+    grp.add(port);
+    const cap = cyl(0.02, 0.02, 0.012, 8, new THREE.MeshStandardMaterial({ color: colors[i], metalness: 0.6, roughness: 0.4 }));
+    cap.rotation.x = Math.PI / 2;
+    cap.position.set(-0.07 + i * 0.07, 0.02, 0.042);
+    grp.add(cap);
+  }
+  return grp;
+}
+function chevronPlate(w = 0.3, h = 0.08) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 16;
+  const x = c.getContext('2d');
+  for (let i = -1; i < 5; i++) {
+    x.fillStyle = i % 2 ? '#141414' : '#ffb43c';
+    x.beginPath();
+    x.moveTo(i * 16, 0); x.lineTo(i * 16 + 16, 0);
+    x.lineTo(i * 16 + 24, 16); x.lineTo(i * 16 + 8, 16);
+    x.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({
+    map: t, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1,
+  }));
+}
+
 // ---------------- EPOC — modular reusable rover ----------------
 export function buildEpoc() {
   const g = new THREE.Group();
@@ -392,6 +467,18 @@ export function buildEpoc() {
       w.position.set(x, wheelR, z);
       g.add(w);
       wheels.push(w);
+      // steering knuckle + drive motor canister travel WITH the wheel
+      const knuckle = box(0.09, 0.14, 0.07, mats.dark);
+      knuckle.position.set(0, 0.14, -side * 0.19);
+      w.add(knuckle);
+      const driveMotor = cyl(0.055, 0.055, 0.1, 8, mats.capSilver);
+      driveMotor.rotation.x = Math.PI / 2;
+      driveMotor.position.set(0, 0, -side * 0.2);
+      w.add(driveMotor);
+      const upright = cyl(0.026, 0.026, 0.34, 6, mats.alu);
+      upright.position.set(0, 0.3, -side * 0.16);
+      upright.rotation.x = side * 0.35;
+      w.add(upright);
       // carbon fender arch riding over each wheel
       const fender = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.045, 8, 14, Math.PI), mats.carbon);
       fender.position.set(x, 0.5, z);
@@ -403,10 +490,31 @@ export function buildEpoc() {
   const mast = cyl(0.06, 0.08, 1.05, 10, mats.alu);
   mast.position.set(0.8, 1.7, -0.34);
   g.add(mast);
+  // pan-tilt neck: yaw drum, clevis plates, tilt pivot under the head
+  const panDrum = cyl(0.075, 0.075, 0.07, 10, mats.gold);
+  panDrum.position.set(0.8, 2.14, -0.34);
+  g.add(panDrum);
+  for (const s of [-1, 1]) {
+    const clevis = box(0.09, 0.1, 0.016, mats.dark);
+    clevis.position.set(0.8, 2.2, -0.34 + s * 0.055);
+    g.add(clevis);
+  }
+  const tiltPin = cyl(0.02, 0.02, 0.16, 8, mats.capSilver);
+  tiltPin.rotation.x = Math.PI / 2;
+  tiltPin.position.set(0.8, 2.21, -0.34);
+  g.add(tiltPin);
+  const mastRing = boltRing(0.075, 6);
+  mastRing.position.set(0.8, 1.155 + 1.05, -0.34);
+  g.add(mastRing);
   const head = box(0.4, 0.17, 0.2, mats.dark);
   head.position.set(0.8, 2.26, -0.34);
   edges(head);
   g.add(head);
+  // stereo sunshade visor over the eyes
+  const sunshade = box(0.42, 0.02, 0.24, mats.body);
+  sunshade.position.set(0.82, 2.36, -0.34);
+  sunshade.rotation.z = -0.12;
+  g.add(sunshade);
   for (const side of [-1, 1]) {
     const eye = new THREE.Mesh(new THREE.CircleGeometry(0.045, 12), makeGlowMat(CYAN, 0x0a1418));
     eye.position.set(0.985, 2.26, -0.34 + side * 0.09);
@@ -443,20 +551,47 @@ export function buildEpoc() {
   armRoot.position.set(-0.95, 1.72, 0);
   const shoulderHub = cyl(0.09, 0.09, 0.14, 12, mats.gold);
   armRoot.add(shoulderHub);
+  // shoulder pitch motor drum across the joint + bolt ring on the yaw
+  const shoulderDrum = cyl(0.06, 0.06, 0.22, 10, mats.capSilver);
+  shoulderDrum.rotation.x = Math.PI / 2;
+  shoulderDrum.position.y = 0.02;
+  armRoot.add(shoulderDrum);
+  const yawRing = boltRing(0.1, 8);
+  yawRing.position.y = -0.08;
+  armRoot.add(yawRing);
   const ARM_L1 = 1.05, ARM_L2 = 1.0;
   const upper = new THREE.Group();
   const upperSeg = box(0.065, ARM_L1, 0.065, mats.alu);
   upperSeg.position.y = ARM_L1 / 2;
   upper.add(upperSeg);
+  // cable loom articulating WITH the upper arm
+  const upperLoom = conduit([[0.05, 0.08, 0.03], [0.07, ARM_L1 * 0.5, 0.045], [0.05, ARM_L1 - 0.06, 0.03]], 0.013, mats.black);
+  upper.add(upperLoom);
+  // twin structural ribs
+  for (const s of [-1, 1]) {
+    const rib = box(0.02, ARM_L1 * 0.72, 0.09, mats.dark);
+    rib.position.set(s * 0.042, ARM_L1 / 2, 0);
+    upper.add(rib);
+  }
   const elbowHub = cyl(0.07, 0.07, 0.12, 10, mats.gold);
   elbowHub.rotation.x = Math.PI / 2;
   elbowHub.position.y = ARM_L1;
   upper.add(elbowHub);
+  const elbowDrum = cyl(0.05, 0.05, 0.18, 10, mats.capSilver);
+  elbowDrum.rotation.x = Math.PI / 2;
+  elbowDrum.position.set(0.04, ARM_L1, 0);
+  upper.add(elbowDrum);
   const fore = new THREE.Group();
   fore.position.y = ARM_L1;
   const foreSeg = box(0.055, ARM_L2 - 0.18, 0.055, mats.alu);
   foreSeg.position.y = (ARM_L2 - 0.18) / 2;
   fore.add(foreSeg);
+  const foreLoom = conduit([[0.04, 0.06, -0.03], [0.055, (ARM_L2 - 0.18) * 0.5, -0.04], [0.04, ARM_L2 - 0.22, -0.028]], 0.011, mats.black);
+  fore.add(foreLoom);
+  // wrist rotator disc + camera already on the elbow; rotator sells DOF
+  const wristRotator = cyl(0.06, 0.06, 0.05, 12, mats.gold);
+  wristRotator.position.y = ARM_L2 - 0.2;
+  fore.add(wristRotator);
   const wrist = box(0.11, 0.1, 0.09, mats.dark);
   wrist.position.y = ARM_L2 - 0.14;
   fore.add(wrist);
@@ -483,6 +618,62 @@ export function buildEpoc() {
   // draped forward-down, everything above the avionics roofline
   armRoot.rotation.z = 0.15;
   fore.rotation.z = -2.4;
+
+  // --- deck systems: conduits, power, umbilicals, hand fixtures ---
+  // cable runs: avionics -> mast base, avionics -> arm pedestal,
+  // battery -> bay (routed along the deck, below the arm's raised arcs)
+  g.add(conduit([[-0.05, 1.6, -0.1], [0.4, 1.45, -0.28], [0.76, 1.28, -0.33]], 0.015, mats.black));
+  g.add(conduit([[-0.85, 1.6, 0.08], [-0.92, 1.5, 0.05], [-0.95, 1.3, 0.02]], 0.015, mats.black));
+  g.add(conduit([[-0.1, 1.2, 0.5], [0.25, 1.24, 0.42], [0.45, 1.3, 0.3]], 0.013, mats.dark));
+  // RTG-style finned power canister tucked at the rear corner
+  const rtg = cyl(0.11, 0.11, 0.42, 10, mats.dark);
+  rtg.rotation.z = Math.PI / 2;
+  rtg.position.set(-0.78, 1.3, 0.42);
+  g.add(rtg);
+  for (let i = 0; i < 6; i++) {
+    const fin = box(0.4, 0.14, 0.012, mats.body);
+    fin.position.set(-0.78, 1.3, 0.42);
+    fin.rotation.x = (i / 6) * Math.PI;
+    g.add(fin);
+  }
+  // umbilical service panel on the tail + louvered vents on the skirt
+  const umb = umbilicalPanel();
+  umb.position.set(-1.16, 1.02, -0.3);
+  umb.rotation.y = -Math.PI / 2 - 0.45;
+  g.add(umb);
+  for (const s of [-1, 1]) {
+    const vent = ventPanel(0.3, 0.16, 4);
+    vent.position.set(0.85, 1.02, s * 0.68);
+    vent.rotation.y = s > 0 ? 0 : Math.PI;
+    vent.rotation.x = s * -0.5;
+    g.add(vent);
+  }
+  // grab handles + tie-down cleats along the deck edges
+  for (const [hx, hz] of [[0.15, 0.62], [-0.5, 0.62], [0.15, -0.6]]) {
+    const rail = handrail(0.3, 0.08);
+    rail.position.set(hx, 1.19, hz);
+    g.add(rail);
+  }
+  for (const [cx, cz] of [[0.95, 0.55], [0.95, -0.55], [-0.85, 0.55], [-0.85, -0.55]]) {
+    const cleat = box(0.05, 0.05, 0.09, mats.gold);
+    cleat.position.set(cx, 1.2, cz);
+    g.add(cleat);
+  }
+  // UHF whip on the rear deck, off the arm's working sectors
+  const uhf = cyl(0.008, 0.012, 0.6, 6, mats.dark);
+  uhf.position.set(-0.2, 1.5, -0.55);
+  g.add(uhf);
+  const uhfTip = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), makeGlowMat(ACCENT));
+  uhfTip.position.set(-0.2, 1.82, -0.55);
+  glows.push(uhfTip.material);
+  g.add(uhfTip);
+  // front recovery hooks under the visor
+  for (const s of [-1, 1]) {
+    const hookF = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.016, 6, 12), mats.gold);
+    hookF.rotation.y = Math.PI / 2;
+    hookF.position.set(1.16, 0.86, s * 0.34);
+    g.add(hookF);
+  }
 
   // --- cameras everywhere: hazcams, navcams, side & rear imagers ---
   const camPod = (mount = true) => {
@@ -869,6 +1060,45 @@ export function buildOasys() {
     g.add(decal);
   }
 
+  // slot divider grid inside the magazine (below the cartridge tops, so
+  // the bays read as engineered cells rather than a loose bin)
+  for (const dx of [-0.5525, 0.0025, 0.5575]) {
+    const fin = box(0.016, 0.2, magD - 2 * wall - 0.02, mats.dark);
+    fin.position.set(dx, 0.79, 0);
+    g.add(fin);
+  }
+  const finZ = box(magW - 2 * wall - 0.02, 0.2, 0.016, mats.dark);
+  finZ.position.set(0, 0.79, 0);
+  g.add(finZ);
+  // gooseneck plates carrying the chassis loads into the drawbar pivot
+  for (const s of [-1, 1]) {
+    const neck = box(0.46, 0.16, 0.028, mats.dark);
+    neck.position.set(1.33, 0.52, s * 0.11);
+    neck.rotation.z = -0.12;
+    edges(neck);
+    g.add(neck);
+  }
+  // battery pack under the bed + feed conduit down from the solar strip
+  const battery = box(0.5, 0.18, 0.6, mats.black);
+  battery.position.set(-0.6, 0.4, 0);
+  g.add(battery);
+  g.add(conduit([[0.05, magY + magH / 2 + 0.08, -(magD / 2 + 0.12)], [-0.25, magY, -(magD / 2 + 0.06)], [-0.5, 0.55, -(magD / 2 - 0.1)], [-0.6, 0.46, -0.2]], 0.014, mats.black));
+  // spare wheel racked on the rear wall + service handles + chevrons
+  const spare = meshWheel(0.21, 0.15);
+  spare.rotation.y = Math.PI / 2;
+  spare.position.set(-1.36, 0.9, -0.3);
+  g.add(spare);
+  const rail1 = handrail(0.4, 0.09);
+  rail1.position.set(-1.32, 1.05, 0.3);
+  rail1.rotation.y = Math.PI / 2;
+  g.add(rail1);
+  for (const s of [-1, 0, 1]) {
+    const chev = chevronPlate(0.26, 0.07);
+    chev.position.set(1.325, 0.85, s * 0.36);
+    chev.rotation.y = Math.PI / 2;
+    g.add(chev);
+  }
+
   const lamp = new THREE.PointLight(CYAN, 0, 7, 2);
   lamp.position.set(0, 1.6, 0);
   g.add(lamp);
@@ -1075,6 +1305,47 @@ export function buildLander() {
     g.add(quad);
   }
 
+  // --- propellant system: 4 spherical tanks nested between the legs,
+  // plumbed into the engine; gimbal ring + actuators on the nozzle ---
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const tx = Math.cos(a) * 2.45, tz = Math.sin(a) * 2.45;
+    const tank = new THREE.Mesh(new THREE.SphereGeometry(0.48, 18, 14), i % 2 ? mats.mli : mats.gold);
+    tank.position.set(tx, 0.92, tz);
+    g.add(tank);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.022, 8, 22), mats.alu);
+    band.rotation.x = Math.PI / 2;
+    band.position.set(tx, 0.92, tz);
+    g.add(band);
+    for (const sa of [-0.5, 0.5]) {
+      const strut = cyl(0.028, 0.028, 0.62, 6, mats.alu);
+      strut.position.set(tx + Math.cos(a + sa) * 0.3, 1.28, tz + Math.sin(a + sa) * 0.3);
+      strut.rotation.z = Math.cos(a + sa) * 0.45;
+      strut.rotation.x = -Math.sin(a + sa) * 0.45;
+      g.add(strut);
+    }
+    // feed line arcing from the tank to the engine mount
+    g.add(conduit([[tx, 0.55, tz], [tx * 0.55, 0.42, tz * 0.55], [0.28 * Math.cos(a), 0.5, 0.28 * Math.sin(a)]], 0.022, mats.copper));
+  }
+  const gimbal = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.035, 8, 20), mats.dark);
+  gimbal.rotation.x = Math.PI / 2;
+  gimbal.position.y = 0.62;
+  g.add(gimbal);
+  for (const ga of [0.8, 2.4]) {
+    const act = cyl(0.03, 0.03, 0.5, 8, mats.capSilver);
+    act.position.set(Math.cos(ga) * 0.62, 0.44, Math.sin(ga) * 0.62);
+    act.rotation.z = Math.cos(ga) * 0.7;
+    act.rotation.x = -Math.sin(ga) * 0.7;
+    g.add(act);
+  }
+  // nozzle stiffening ribs
+  for (const [ry, rr] of [[0.05, 0.72], [-0.12, 0.55], [-0.28, 0.38]]) {
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.016, 6, 20), mats.dark);
+    rib.rotation.x = Math.PI / 2;
+    rib.position.y = ry + 0.15;
+    g.add(rib);
+  }
+
   // --- comms: high-gain dish + antenna + beacon ---
   const dishArm = cyl(0.035, 0.035, 0.75, 8, mats.alu);
   dishArm.position.set(1.3, DECK_Y + 0.38, -2.2);
@@ -1088,6 +1359,95 @@ export function buildLander() {
   const deckElecL = greebleCluster(67, 1.4, 0.8);
   deckElecL.position.set(-0.6, DECK_Y + 0.05, 1.9);
   g.add(deckElecL);
+
+  // --- deck outfitting (all OUTSIDE the convoy's drive lane |z|<1.2) ---
+  // floodlight mast lighting the deck ops
+  const flPost = cyl(0.035, 0.045, 1.05, 8, mats.alu);
+  flPost.position.set(-1.6, DECK_Y + 0.55, -2.1);
+  g.add(flPost);
+  const flHead = box(0.26, 0.1, 0.14, mats.dark);
+  flHead.position.set(-1.55, DECK_Y + 1.1, -2.05);
+  flHead.rotation.y = 0.5;
+  flHead.rotation.z = -0.35;
+  g.add(flHead);
+  const flLens = box(0.2, 0.03, 0.1, makeGlowMat(0xfff3d0, 0x211d15));
+  flLens.position.set(-1.53, DECK_Y + 1.06, -2.03);
+  flLens.rotation.y = 0.5;
+  flLens.rotation.z = -0.35;
+  glows.push(flLens.material);
+  g.add(flLens);
+  // handrail runs along the aft deck rim
+  for (const hz of [-1, 1]) {
+    const hr = handrail(1.5, 0.14);
+    hr.position.set(-2.35, DECK_Y + 0.05, hz * 1.9);
+    hr.rotation.y = hz * 0.65;
+    g.add(hr);
+  }
+  // star tracker pair + deck umbilical panel
+  for (const sa of [-0.35, 0.35]) {
+    const st = cyl(0.05, 0.07, 0.2, 8, mats.black);
+    st.position.set(-2.45 + sa * 0.3, DECK_Y + 0.16, -1.55);
+    st.rotation.x = sa;
+    st.rotation.z = 0.4;
+    g.add(st);
+  }
+  const landerUmb = umbilicalPanel();
+  landerUmb.position.set(-2.0, DECK_Y + 0.14, 1.62);
+  landerUmb.rotation.x = -Math.PI / 2;
+  g.add(landerUmb);
+  // landing beacons at the deck rim diagonals
+  for (const [bx, bz] of [[2.1, 2.1], [2.1, -2.1], [-2.1, 2.1], [-2.1, -2.1]]) {
+    const stud = cyl(0.045, 0.055, 0.05, 8, mats.dark);
+    stud.position.set(bx, DECK_Y + 0.07, bz);
+    g.add(stud);
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), makeGlowMat(ACCENT));
+    lens.position.set(bx, DECK_Y + 0.11, bz);
+    glows.push(lens.material);
+    g.add(lens);
+  }
+  // ramp winch: drum + fairlead beside the ramp root, off the lane
+  const winch = cyl(0.09, 0.09, 0.3, 10, mats.dark);
+  winch.rotation.x = Math.PI / 2;
+  winch.position.set(2.55, DECK_Y + 0.14, -1.45);
+  g.add(winch);
+  const fairlead = box(0.08, 0.08, 0.1, mats.gold);
+  fairlead.position.set(2.85, DECK_Y + 0.1, -1.45);
+  g.add(fairlead);
+  // LEAP-1 wordmark on two bus panels
+  const lCanvas = document.createElement('canvas');
+  lCanvas.width = 256; lCanvas.height = 64;
+  const lctx = lCanvas.getContext('2d');
+  lctx.fillStyle = '#ffb43c';
+  lctx.fillRect(6, 8, 10, 48);
+  lctx.fillStyle = '#e8e5df';
+  lctx.font = '700 44px Arial';
+  lctx.fillText('LEAP-1', 28, 50);
+  const lTex = new THREE.CanvasTexture(lCanvas);
+  lTex.colorSpace = THREE.SRGBColorSpace;
+  for (const pa of [Math.PI * 0.75, Math.PI * 1.75]) {
+    const decal = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.24), new THREE.MeshStandardMaterial({
+      map: lTex, transparent: true, roughness: 0.6, metalness: 0.1,
+      polygonOffset: true, polygonOffsetFactor: -1,
+    }));
+    decal.position.set(Math.cos(pa) * (BODY_R + 0.045), DECK_Y - 0.55, Math.sin(pa) * (BODY_R + 0.045));
+    decal.rotation.y = -pa + Math.PI / 2;
+    g.add(decal);
+  }
+  // hoses + contact probes on two legs
+  for (const li of [0, 2]) {
+    const a = (li / 4) * Math.PI * 2 + Math.PI / 4;
+    const hx = Math.cos(a), hz = Math.sin(a);
+    g.add(conduit([
+      [hx * 2.9, DECK_Y - 0.6, hz * 2.9],
+      [hx * 3.6, 1.05, hz * 3.6],
+      [hx * 4.5, 0.35, hz * 4.5],
+    ], 0.02, mats.black));
+    const probe = cyl(0.012, 0.012, 0.7, 6, mats.alu);
+    probe.position.set(hx * 5.35, 0.36, hz * 5.35);
+    probe.rotation.z = hx * 0.9;
+    probe.rotation.x = -hz * 0.9;
+    g.add(probe);
+  }
   const deckElecL2 = greebleCluster(83, 1.2, 0.7);
   deckElecL2.position.set(1.8, DECK_Y + 0.05, 1.4);
   g.add(deckElecL2);
