@@ -448,20 +448,37 @@ export function buildEpoc() {
   bellyAnchor.position.set(0.6, 1.37, 0.12);
   g.add(bellyAnchor);
 
-  // --- suspension + 6 mesh wheels ---
+  // --- TRUE ROCKER-BOGIE (MSL/Perseverance geometry): per side, a main
+  // rocker carries the front wheel and hands the bogie a pivot; the
+  // bogie carries middle + rear. A differential bar across the deck ties
+  // the two rockers together through drop links — the NASA signature ---
+  const bar2 = (x1, y1, x2, y2, z, th = 0.06, mat = mats.alu) => {
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    const b = box(len + th * 0.6, th, th, mat);
+    b.position.set((x1 + x2) / 2, (y1 + y2) / 2, z);
+    b.rotation.z = Math.atan2(y2 - y1, x2 - x1);
+    return b;
+  };
   const wheels = [];
   const wheelR = 0.36;
   for (const side of [-1, 1]) {
     const z = side * 0.78;
-    // rocker: deck to middle wheel + front strut
-    const rocker = box(1.15, 0.07, 0.07, mats.alu);
-    rocker.position.set(0.35, 0.82, z);
-    rocker.rotation.z = 0.24;
-    g.add(rocker);
-    const bogie = box(1.15, 0.07, 0.07, mats.alu);
-    bogie.position.set(-0.5, 0.75, z);
-    bogie.rotation.z = -0.28;
-    g.add(bogie);
+    // main rocker: front hub up to the main pivot
+    g.add(bar2(0.95, 0.44, 0.15, 0.95, z, 0.07));
+    // rocker rear leg down to the bogie pivot
+    g.add(bar2(0.15, 0.95, -0.42, 0.72, z, 0.07));
+    // bogie: middle hub and rear hub hang off the bogie pivot
+    g.add(bar2(-0.42, 0.72, 0.05, 0.44, z, 0.06));
+    g.add(bar2(-0.42, 0.72, -0.95, 0.44, z, 0.06));
+    // pivot drums
+    for (const [px, py, pr] of [[0.15, 0.95, 0.075], [-0.42, 0.72, 0.06]]) {
+      const pivot = cyl(pr, pr, 0.1, 10, mats.gold);
+      pivot.rotation.x = Math.PI / 2;
+      pivot.position.set(px, py, z);
+      g.add(pivot);
+    }
+    // differential drop link up the body side
+    g.add(bar2(0.15, 0.98, 0.1, 1.21, z + side * 0.015, 0.035, mats.dark));
     for (const x of [-0.95, 0.05, 0.95]) {
       const w = meshWheel(wheelR, 0.26, true);
       w.position.set(x, wheelR, z);
@@ -485,6 +502,14 @@ export function buildEpoc() {
       g.add(fender);
     }
   }
+  // the differential bar itself, spanning the deck between drop links
+  const diffBar = cyl(0.032, 0.032, 1.64, 8, mats.gold);
+  diffBar.rotation.x = Math.PI / 2;
+  diffBar.position.set(0.1, 1.225, 0);
+  g.add(diffBar);
+  const diffHub = box(0.1, 0.07, 0.12, mats.dark);
+  diffHub.position.set(0.1, 1.225, 0);
+  g.add(diffHub);
 
   // --- sensor mast (kept clear of the arm's swing plane) ---
   const mast = cyl(0.06, 0.08, 1.05, 10, mats.alu);
@@ -506,18 +531,28 @@ export function buildEpoc() {
   const mastRing = boltRing(0.075, 6);
   mastRing.position.set(0.8, 1.155 + 1.05, -0.34);
   g.add(mastRing);
-  const head = box(0.4, 0.17, 0.2, mats.dark);
-  head.position.set(0.8, 2.26, -0.34);
+  // Perseverance-style head: white housing, twin Mastcam boxes with
+  // dark apertures, a row of round navcam lenses beneath, sunshade brow
+  const head = box(0.44, 0.2, 0.24, mats.body);
+  head.position.set(0.8, 2.27, -0.34);
   edges(head);
   g.add(head);
-  // stereo sunshade visor over the eyes
-  const sunshade = box(0.42, 0.02, 0.24, mats.body);
-  sunshade.position.set(0.82, 2.36, -0.34);
+  for (const side of [-1, 1]) {
+    const mastcam = box(0.07, 0.09, 0.08, mats.dark);
+    mastcam.position.set(1.0, 2.3, -0.34 + side * 0.07);
+    g.add(mastcam);
+    const aperture = new THREE.Mesh(new THREE.CircleGeometry(0.026, 10), mats.black);
+    aperture.position.set(1.038, 2.3, -0.34 + side * 0.07);
+    aperture.rotation.y = Math.PI / 2;
+    g.add(aperture);
+  }
+  const sunshade = box(0.48, 0.02, 0.28, mats.body);
+  sunshade.position.set(0.83, 2.39, -0.34);
   sunshade.rotation.z = -0.12;
   g.add(sunshade);
   for (const side of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.045, 12), makeGlowMat(CYAN, 0x0a1418));
-    eye.position.set(0.985, 2.26, -0.34 + side * 0.09);
+    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.038, 12), makeGlowMat(CYAN, 0x0a1418));
+    eye.position.set(1.025, 2.2, -0.34 + side * 0.09);
     eye.rotation.y = Math.PI / 2;
     glows.push(eye.material);
     g.add(eye);
@@ -527,7 +562,21 @@ export function buildEpoc() {
   const dishArm = cyl(0.02, 0.02, 0.4, 6, mats.alu);
   dishArm.position.set(-0.95, 1.55, -0.4);
   g.add(dishArm);
-  const dish = makeDish(0.21);
+  // hexagonal flat-panel HGA on a gimbal fork (MSL idiom); the bowl
+  // opens along local +Y so the orbiter-tracking code is unchanged
+  const dish = new THREE.Group();
+  const hgaFork = box(0.05, 0.1, 0.14, mats.dark);
+  hgaFork.position.y = -0.06;
+  dish.add(hgaFork);
+  const hgaPlate = cyl(0.2, 0.17, 0.035, 6, mats.body);
+  edges(hgaPlate);
+  dish.add(hgaPlate);
+  const hgaPattern = cyl(0.155, 0.155, 0.012, 6, new THREE.MeshStandardMaterial({ color: 0xd9d2c4, metalness: 0.5, roughness: 0.45 }));
+  hgaPattern.position.y = 0.024;
+  dish.add(hgaPattern);
+  const hgaFeed = cyl(0.012, 0.03, 0.12, 6, mats.gold);
+  hgaFeed.position.y = 0.09;
+  dish.add(hgaFeed);
   dish.position.set(-0.95, 1.76, -0.4);
   dish.rotation.x = -0.7;
   dish.rotation.z = 0.25;
@@ -592,6 +641,21 @@ export function buildEpoc() {
   const wristRotator = cyl(0.06, 0.06, 0.05, 12, mats.gold);
   wristRotator.position.y = ARM_L2 - 0.2;
   fore.add(wristRotator);
+  // instrument TURRET around the wrist (Perseverance idiom): the grapple
+  // is one tool among several clustered on the rotator
+  const turretDrum = cyl(0.085, 0.095, 0.07, 10, mats.dark);
+  turretDrum.position.y = ARM_L2 - 0.13;
+  fore.add(turretDrum);
+  const drill = cyl(0.028, 0.035, 0.11, 8, mats.capSilver);
+  drill.position.set(0.1, ARM_L2 - 0.12, 0);
+  fore.add(drill);
+  const specPod = box(0.055, 0.08, 0.05, mats.alu);
+  specPod.position.set(-0.09, ARM_L2 - 0.13, 0.04);
+  fore.add(specPod);
+  const turretCam = cyl(0.02, 0.024, 0.05, 8, mats.black);
+  turretCam.position.set(0, ARM_L2 - 0.12, -0.1);
+  turretCam.rotation.x = Math.PI / 2;
+  fore.add(turretCam);
   const wrist = box(0.11, 0.1, 0.09, mats.dark);
   wrist.position.y = ARM_L2 - 0.14;
   fore.add(wrist);
@@ -625,17 +689,25 @@ export function buildEpoc() {
   g.add(conduit([[-0.05, 1.6, -0.1], [0.4, 1.45, -0.28], [0.76, 1.28, -0.33]], 0.015, mats.black));
   g.add(conduit([[-0.85, 1.6, 0.08], [-0.92, 1.5, 0.05], [-0.95, 1.3, 0.02]], 0.015, mats.black));
   g.add(conduit([[-0.1, 1.2, 0.5], [0.25, 1.24, 0.42], [0.45, 1.3, 0.3]], 0.013, mats.dark));
-  // RTG-style finned power canister tucked at the rear corner
-  const rtg = cyl(0.11, 0.11, 0.42, 10, mats.dark);
-  rtg.rotation.z = Math.PI / 2;
-  rtg.position.set(-0.78, 1.3, 0.42);
-  g.add(rtg);
-  for (let i = 0; i < 6; i++) {
-    const fin = box(0.4, 0.14, 0.012, mats.body);
-    fin.position.set(-0.78, 1.3, 0.42);
-    fin.rotation.x = (i / 6) * Math.PI;
-    g.add(fin);
+  // MSL-style RTG: angled finned canister off the rear corner, radial
+  // white fin plates along the full length (kept at z 0.42, outside the
+  // arm's rear pick corridor, and under its swing lines)
+  const rtgGrp = new THREE.Group();
+  rtgGrp.position.set(-0.92, 1.34, 0.42);
+  rtgGrp.rotation.z = 0.3;
+  const rtgCan = cyl(0.1, 0.1, 0.52, 10, mats.dark);
+  rtgCan.rotation.z = Math.PI / 2;
+  rtgGrp.add(rtgCan);
+  for (let i = 0; i < 8; i++) {
+    const fin = box(0.5, 0.26, 0.012, mats.body);
+    fin.rotation.x = (i / 8) * Math.PI;
+    rtgGrp.add(fin);
   }
+  const rtgCap = cyl(0.075, 0.075, 0.05, 10, mats.gold);
+  rtgCap.rotation.z = Math.PI / 2;
+  rtgCap.position.x = -0.28;
+  rtgGrp.add(rtgCap);
+  g.add(rtgGrp);
   // umbilical service panel on the tail + louvered vents on the skirt
   const umb = umbilicalPanel();
   umb.position.set(-1.16, 1.02, -0.3);
@@ -967,6 +1039,42 @@ export function buildOasys() {
       g.add(rocker);
     }
   }
+  // walking-beam bogies (NASA cargo-cart idiom): an inboard beam links
+  // each wheel pair through a centre pivot, stub axles reach the hubs
+  for (const side of [-1, 1]) {
+    const beam = box(1.5, 0.08, 0.06, mats.alu);
+    beam.position.set(0, 0.36, side * 0.66);
+    g.add(beam);
+    const beamPivot = cyl(0.055, 0.055, 0.1, 8, mats.gold);
+    beamPivot.rotation.x = Math.PI / 2;
+    beamPivot.position.set(0, 0.4, side * 0.6);
+    g.add(beamPivot);
+    for (const x of [-0.72, 0.72]) {
+      const stub = cyl(0.028, 0.028, 0.2, 6, mats.dark);
+      stub.rotation.x = Math.PI / 2;
+      stub.position.set(x, 0.32, side * 0.75);
+      g.add(stub);
+    }
+  }
+  // corner turnbuckle tie-rods bracing the magazine to the bed
+  for (const px of [-1, 1]) {
+    for (const pz of [-1, 1]) {
+      g.add(conduit([
+        [px * 1.16, 0.64, pz * 0.66],
+        [px * 1.27, 1.24, pz * 0.6],
+      ], 0.012, mats.capSilver));
+    }
+  }
+  // stowed jockey stand under the gooseneck
+  const jockey = cyl(0.024, 0.024, 0.34, 6, mats.alu);
+  jockey.rotation.z = Math.PI / 2;
+  jockey.position.set(1.08, 0.33, 0.16);
+  g.add(jockey);
+  const jockeyFoot = cyl(0.05, 0.06, 0.03, 8, mats.dark);
+  jockeyFoot.rotation.z = Math.PI / 2;
+  jockeyFoot.position.set(1.26, 0.33, 0.16);
+  g.add(jockeyFoot);
+
   // rear fascia: bumper beam, amber tail lights, aft hazcam, mudflaps
   const bumper = box(0.08, 0.1, 1.3, mats.dark);
   bumper.position.set(-1.3, 0.5, 0);
@@ -1286,7 +1394,34 @@ export function buildLander() {
     const padTop = cyl(0.18, 0.18, 0.14, 10, mats.alu);
     padTop.position.set(foot.x, 0.2, foot.z);
     g.add(padTop);
+    // cross tie-rod between the two secondary struts (Nova-C idiom)
+    const tieL = new THREE.Vector3(Math.cos(a - 0.38) * 2.75, 0.6, Math.sin(a - 0.38) * 2.75).lerp(mid, 0.5);
+    const tieR = new THREE.Vector3(Math.cos(a + 0.38) * 2.75, 0.6, Math.sin(a + 0.38) * 2.75).lerp(mid, 0.5);
+    g.add(conduit([[tieL.x, tieL.y, tieL.z], [tieR.x, tieR.y, tieR.z]], 0.02, mats.alu));
   }
+  // twin COPV pressurant spheres flanking the engine, visible from below
+  for (const ca of [Math.PI * 0.5, Math.PI * 1.5]) {
+    const copv = new THREE.Mesh(new THREE.SphereGeometry(0.24, 14, 10), mats.black);
+    copv.position.set(Math.cos(ca) * 1.25, 0.55, Math.sin(ca) * 1.25);
+    g.add(copv);
+    const copvBand = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.016, 6, 16), mats.capSilver);
+    copvBand.rotation.x = Math.PI / 2;
+    copvBand.position.copy(copv.position);
+    g.add(copvBand);
+  }
+  // antenna farm on the aft deck: UHF whip + helix + LGA cone
+  const uhfL = cyl(0.01, 0.014, 0.9, 6, mats.dark);
+  uhfL.position.set(-2.2, DECK_Y + 0.5, 1.5);
+  g.add(uhfL);
+  for (let i = 0; i < 6; i++) {
+    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.008, 6, 12), mats.copper);
+    coil.rotation.x = Math.PI / 2;
+    coil.position.set(-2.55, DECK_Y + 0.12 + i * 0.05, 1.15);
+    g.add(coil);
+  }
+  const lga = cyl(0.02, 0.06, 0.12, 8, mats.body);
+  lga.position.set(-2.35, DECK_Y + 0.12, -1.5);
+  g.add(lga);
 
   // --- RCS thruster quads on alternating panels ---
   for (let i = 0; i < 4; i++) {
