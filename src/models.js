@@ -11,6 +11,7 @@
 // Scale: 1 unit ≈ 1 m.
 // ============================================================
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { T } from './textures.js';
 
 export const ACCENT = 0xffb43c;
@@ -47,12 +48,18 @@ export function makeGlowMat(color, base = 0x111111) {
 }
 
 function edges(mesh, mat = edgeMat) {
-  const e = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 30), mat);
+  // 48deg threshold: rounded-box bevel strips meet at gentler angles and
+  // must NOT get outlined, or every part reads as a wireframe
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 48), mat);
   mesh.add(e);
   return e;
 }
+// every box in the fleet is a ROUNDED box: a small machined fillet on
+// each edge catches specular light, which is what separates fabricated
+// hardware from cardboard. Radius is capped so thin strips stay crisp.
 function box(w, h, d, mat = mats.body) {
-  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  const r = Math.min(0.022, w * 0.32, h * 0.32, d * 0.32);
+  return new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, r), mat);
 }
 function cyl(rt, rb, h, seg, mat = mats.body) {
   return new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat);
