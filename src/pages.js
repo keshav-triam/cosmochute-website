@@ -5,8 +5,9 @@
 // three design variants; visitors compare them live and the
 // choice is remembered per page (and shareable via ?v=).
 // ============================================================
-import './styles.css';
-import './pages.css';
+// NOTE: styles.css + pages.css load as render-blocking <link>s in each
+// page head — importing them here too would inject them late and bring
+// back the unstyled first-paint flash the boot veil exists to prevent
 import { initPageFX } from './pagefx.js';
 
 const body = document.body;
@@ -171,3 +172,20 @@ setVersion = function (v, push = true) {
 decorateChrome();
 buildPicker();
 setVersion(currentDefault(), false);
+
+// ---------------- boot veil dismissal ----------------
+const pageboot = document.getElementById('pageboot');
+if (pageboot) {
+  let lifted = false;
+  const lift = () => {
+    if (lifted) return;
+    lifted = true;
+    pageboot.classList.add('done');
+  };
+  // lift once everything (textures included) has loaded, with a short
+  // grace so the first styled+rendered frame is what gets revealed
+  if (document.readyState === 'complete') setTimeout(lift, 300);
+  else window.addEventListener('load', () => setTimeout(lift, 300));
+  // hard fallback: never trap the visitor behind the veil
+  setTimeout(lift, 3200);
+}
