@@ -95,7 +95,8 @@ export function terrainHeight(x, z) {
 
 export function createWorld(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+  const DPR = () => Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(DPR());
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
@@ -123,10 +124,17 @@ export function createWorld(canvas) {
   // cinematic pipeline: multisampled HDR buffer -> subtle bloom -> ACES
   // output. Bloom lifts the sun, the plume, and the night-time glows into
   // photographic territory without washing out the day scenes.
+  // NOTE: passing a custom render target makes EffectComposer lock its
+  // internal pixel ratio to 1 — it must be told the DPR explicitly and
+  // the target must be allocated at DEVICE resolution, or the whole
+  // composed pipeline renders at CSS resolution and upscales (soft,
+  // blocky, shimmering output on every HiDPI screen)
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(
-    window.innerWidth, window.innerHeight,
+    Math.round(window.innerWidth * DPR()), Math.round(window.innerHeight * DPR()),
     { samples: 4, type: THREE.HalfFloatType },
   ));
+  composer.setPixelRatio(DPR());
+  composer.setSize(window.innerWidth, window.innerHeight);
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight), 0.26, 0.5, 0.92);
@@ -325,8 +333,10 @@ export function createWorld(canvas) {
   }
   const starGeo = new THREE.BufferGeometry();
   starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  // point size is in DEVICE pixels — scale by DPR or stars shrink on
+  // sharp screens (and read as chunky squares on low-DPR buffers)
   const starMat = new THREE.PointsMaterial({
-    color: 0xdfe6f0, size: 1.6, sizeAttenuation: false,
+    color: 0xdfe6f0, size: 1.6 * Math.min(window.devicePixelRatio || 1, 2), sizeAttenuation: false,
     transparent: true, opacity: 0.7, depthWrite: false, fog: false,
   });
   const stars = new THREE.Points(starGeo, starMat);
@@ -736,8 +746,12 @@ export function createWorld(canvas) {
   function resize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
+    // DPR can change when the window moves between monitors
+    renderer.setPixelRatio(DPR());
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setPixelRatio(DPR());
     composer.setSize(window.innerWidth, window.innerHeight);
+    starMat.size = 1.6 * DPR();
   }
   window.addEventListener('resize', resize);
 
