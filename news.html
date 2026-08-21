@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>News — CosmoChute</title>
+  <meta name="description" content="Mission dispatches, engineering notes and announcements from the CosmoChute program." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Chakra+Petch:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='none' stroke='%23ffb43c' stroke-width='2'/><circle cx='21' cy='12' r='4' fill='%23ffb43c'/></svg>" />
+</head>
+<body class="company-page" data-page="news" data-fx="orbiter" data-v="1">
+
+  <canvas id="pagefx" aria-hidden="true"></canvas>
+  <div id="skyfade" aria-hidden="true"></div>
+  <div id="grain" aria-hidden="true"></div>
+
+  <header id="nav">
+    <a class="logo" href="/">COSMO<span>CHUTE</span></a>
+    <nav class="nav-links">
+      <a href="/careers.html">CAREERS</a>
+      <a href="/about.html">ABOUT</a>
+      <a href="/news.html" class="active">NEWS</a>
+      <a href="/partners.html">PARTNERS</a>
+    </nav>
+    <a class="nav-cta" href="/#mission">FLY THE MISSION</a>
+  </header>
+
+  <script type="application/json" id="version-meta">[
+    {"name":"Dispatches","desc":"A dated log feed with a time rail — quiet, chronological, easy to scan and easy to keep updated weekly.","best":"FREQUENT SHORT UPDATES · CHANGELOG CULTURE"},
+    {"name":"Front Page","desc":"A featured lead story with a card grid beneath. Editorial hierarchy for bigger announcements with imagery.","best":"MAJOR ANNOUNCEMENTS · MEDIA PICKUP"},
+    {"name":"Telemetry Stream","desc":"Updates as received transmissions: RX-stamped monospace blocks from the relay. Fully in-world voice.","best":"DEV-LOG FANS · BUILDING IN PUBLIC"}
+  ]</script>
+
+  <main>
+    <!-- ================= V1 — DISPATCHES ================= -->
+    <div class="pv" data-v="1">
+      <section class="section page-hero">
+        <div class="content-block">
+          <div class="kicker rv">NEWS — PROGRAM DISPATCHES</div>
+          <h1 class="display display-huge rv"><span>SIGNAL FROM</span><span>THE <span class="accent">PROGRAM.</span></span></h1>
+          <p class="lede rv">Milestones, engineering notes and announcements — logged as they happen, kept honest.</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="content-wide">
+          <div class="feed rv">
+            <div class="feed-item"><span class="feed-date">2026 · Q3</span><div><h3>OASys completes loaded convoy trials</h3><p>The reload trailer logged its longest towed traverse to date with a full eight-cartridge magazine, validating hitch loads, beam suspension and swap-arm reach across sloped terrain.</p><span class="tag gold">ENGINEERING</span></div></div>
+            <div class="feed-item"><span class="feed-date">2026 · Q3</span><div><h3>LEAP campaign profile locked: crater-to-crater, never back</h3><p>The E1 mission profile is now linear by design — each payload operates at its own site and the convoy always rolls onward, ending at the trailer park ahead of the next landing.</p><span class="tag gold">MISSION</span></div></div>
+            <div class="feed-item"><span class="feed-date">2026 · Q2</span><div><h3>EPOC arm reaches payload-swap cadence targets</h3><p>Grapple-to-latch alignment converged to centimeter class across parked-slope cases; a full magazine swap now fits inside a single relay pass.</p><span class="tag gold">ENGINEERING</span></div></div>
+            <div class="feed-item"><span class="feed-date">2026 · Q2</span><div><h3>8U cartridge interface spec published to partners</h3><p>Power, data and thermal on one face; a payload that fits the box flies on any campaign. The spec is now in partner hands.</p><span class="tag cyan">PARTNERS</span></div></div>
+            <div class="feed-item"><span class="feed-date">2026 · Q1</span><div><h3>Night-survival thermal design passes the 354-hour gauntlet</h3><p>Fleet thermal architecture completed its longest simulated lunar night with margin on every battery and joint heater.</p><span class="tag gold">ENGINEERING</span></div></div>
+            <div class="feed-item"><span class="feed-date">2026 · Q1</span><div><h3>CosmoChute unveils the LEAP program</h3><p>One landing that becomes many missions: EPOC, OASys and the 8U standard, presented as a single reusable campaign architecture.</p><span class="tag">ANNOUNCEMENT</span></div></div>
+          </div>
+          <p class="lede rv" style="margin-top:2rem">Press enquiries: <a class="contact-mail" href="mailto:press@cosmochute.com">press@cosmochute.com</a></p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= V2 — FRONT PAGE ================= -->
+    <div class="pv" data-v="2">
+      <section class="section page-hero">
+        <div class="content-block">
+          <div class="kicker rv">NEWS — FRONT PAGE</div>
+          <h1 class="display display-huge rv"><span>THE <span class="accent">LATEST</span></span><span>FROM THE FLEET.</span></h1>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="content-wide">
+          <article class="news-featured pane rv">
+            <span class="tag gold">FEATURED · MISSION</span>
+            <h2>LEAP campaign profile locked: crater-to-crater, never back</h2>
+            <p>The E1 mission profile is now linear by design. Each payload cartridge operates at its own crater site; the convoy always rolls onward and never doubles back to the lander. The campaign ends where the next one begins — with OASys parked, charged and waiting at the edge of the worked zone.</p>
+            <p style="margin-top:0.8rem"><a class="contact-mail" href="mailto:press@cosmochute.com?subject=LEAP%20campaign">Request the briefing kit →</a></p>
+          </article>
+          <div class="news-grid rv">
+            <article class="news-card pane"><span class="nc-date">2026 · Q3</span><h3>OASys completes loaded convoy trials</h3><p>Longest towed traverse to date with a full magazine — hitch, suspension and swap reach validated on slopes.</p><span class="tag gold">ENGINEERING</span></article>
+            <article class="news-card pane"><span class="nc-date">2026 · Q2</span><h3>EPOC hits payload-swap cadence targets</h3><p>Centimeter-class latch alignment across parked-slope cases; full swaps inside one relay pass.</p><span class="tag gold">ENGINEERING</span></article>
+            <article class="news-card pane"><span class="nc-date">2026 · Q2</span><h3>8U cartridge spec goes to partners</h3><p>Fit the box, fly the campaign: power, data and thermal on one standardized face.</p><span class="tag cyan">PARTNERS</span></article>
+            <article class="news-card pane"><span class="nc-date">2026 · Q1</span><h3>Thermal design survives the 354-hour night</h3><p>Longest simulated lunar night to date, with margin on every heater.</p><span class="tag gold">ENGINEERING</span></article>
+            <article class="news-card pane"><span class="nc-date">2026 · Q1</span><h3>CosmoChute unveils LEAP</h3><p>One landing that becomes many missions — the program, public.</p><span class="tag">ANNOUNCEMENT</span></article>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= V3 — TELEMETRY STREAM ================= -->
+    <div class="pv" data-v="3">
+      <section class="section page-hero">
+        <div class="content-block">
+          <div class="kicker rv">NEWS — RELAY DOWNLINK</div>
+          <h1 class="display display-huge rv"><span>RX: <span class="accent">TRANSMISSIONS</span></span><span>IN THE CLEAR.</span></h1>
+          <p class="lede rv">Program updates as they come off the relay. Timestamped, unpolished, true.</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="content-wide">
+          <div class="rx rv">
+            <div class="rx-block"><div class="rx-head"><span>RX 2026-Q3-014</span><span>VIA RELAY-1</span><span class="rx-ok">SIG GOOD</span></div><h3>OASys loaded convoy trials — complete</h3><p>Full magazine, longest tow yet. Beams, hitch and swap reach all inside limits on sloped ground. The trailer earns its keep.</p></div>
+            <div class="rx-block"><div class="rx-head"><span>RX 2026-Q3-009</span><span>VIA RELAY-1</span><span class="rx-ok">SIG GOOD</span></div><h3>Campaign profile locked</h3><p>Linear, crater-to-crater, never back. Every site gets its payload; the convoy always moves onward. End state: trailer parked, charged, waiting for the next lander.</p></div>
+            <div class="rx-block"><div class="rx-head"><span>RX 2026-Q2-031</span><span>VIA RELAY-1</span><span class="rx-ok">SIG GOOD</span></div><h3>Arm swap cadence — target met</h3><p>Latch alignment centimeter-class on parked slopes. A full magazine swap now fits in a single relay pass. The grapple crew is insufferable and has earned it.</p></div>
+            <div class="rx-block"><div class="rx-head"><span>RX 2026-Q2-018</span><span>GROUND SEGMENT</span><span class="rx-ok">SIG GOOD</span></div><h3>8U interface spec → partners</h3><p>The box is the contract: power, data, thermal on one face. If your payload fits it, it flies.</p></div>
+            <div class="rx-block"><div class="rx-head"><span>RX 2026-Q1-027</span><span>THERMAL VAC</span><span class="rx-ok">SIG GOOD</span></div><h3>354 hours of night — survived</h3><p>Longest simulated lunar night in program history. Margin on every battery, every joint heater. The dark is a design input now, not a fear.</p></div>
+            <div class="rx-block"><div class="rx-head"><span>RX 2026-Q1-001</span><span>EARTH HQ</span><span class="rx-ok">SIG GOOD</span></div><h3>LEAP — program unveiled</h3><p>One landing that becomes many missions. This channel will carry the rest of the story.</p></div>
+          </div>
+          <p class="lede rv" style="margin-top:2rem">Uplink for press: <a class="contact-mail" href="mailto:press@cosmochute.com">press@cosmochute.com</a></p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer id="footer">
+    <div class="foot-left">
+      <div class="logo">COSMO<span>CHUTE</span></div>
+      <p>Reusable infrastructure for sustained lunar operations.</p>
+    </div>
+    <div class="foot-links">
+      <a href="/careers.html">CAREERS</a>
+      <a href="/about.html">ABOUT</a>
+      <a href="/news.html">NEWS</a>
+      <a href="/partners.html">PARTNERS</a>
+    </div>
+    <div class="foot-meta">
+      <span>© 2026 COSMOCHUTE</span>
+      <span>EARTH · MOON · ONWARD</span>
+      <span class="foot-credit">EARTH IMAGERY: SOLAR SYSTEM SCOPE (CC BY 4.0)</span>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/pages.js"></script>
+</body>
+</html>

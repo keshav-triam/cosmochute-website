@@ -15,4 +15,15 @@ const root = dirname(realpathSync(fileURLToPath(import.meta.url)));
 export default defineConfig({
   root,
   server: { fs: { strict: false } },
+  build: {
+    rollupOptions: {
+      input: {
+        main: `${root}/index.html`,
+        careers: `${root}/careers.html`,
+        about: `${root}/about.html`,
+        news: `${root}/news.html`,
+        partners: `${root}/partners.html`,
+      },
+    },
+  },
 });
