@@ -377,13 +377,51 @@ export function createWorld(canvas) {
   earthGrp.position.set(-170, 200, -430);
   scene.add(earthGrp);
 
-  // sun disc sprite
-  const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: glowTex, color: 0xffdca0, transparent: true, opacity: 0.9,
-    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
-  }));
-  sunSprite.scale.setScalar(130);
-  scene.add(sunSprite);
+  // --- the sun, airless-space optics: a SMALL blazing hard disc (the
+  // bloom pass supplies the glare bleed), a tight lens halo, and faint
+  // diffraction spikes. No atmosphere means no big soft sky ball.
+  const sunDiscTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.42, 'rgba(255,255,255,1)');
+    g.addColorStop(0.5, 'rgba(255,244,224,0.85)');
+    g.addColorStop(0.62, 'rgba(255,232,190,0.22)');
+    g.addColorStop(1, 'rgba(255,225,170,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
+  })();
+  const sunSpikeTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d');
+    x.translate(128, 128);
+    for (const [ang, len, w, a] of [[0, 122, 3, 0.85], [Math.PI / 2, 122, 3, 0.85], [Math.PI / 4, 80, 2, 0.35], [-Math.PI / 4, 80, 2, 0.35]]) {
+      x.save(); x.rotate(ang);
+      const g = x.createLinearGradient(-len, 0, len, 0);
+      g.addColorStop(0, 'rgba(255,240,210,0)');
+      g.addColorStop(0.5, `rgba(255,248,230,${a})`);
+      g.addColorStop(1, 'rgba(255,240,210,0)');
+      x.fillStyle = g; x.fillRect(-len, -w, len * 2, w * 2);
+      x.restore();
+    }
+    return new THREE.CanvasTexture(c);
+  })();
+  const sunGrp = new THREE.Group();
+  const mkSunLayer = (tex, scale, op) => {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, color: 0xffffff, transparent: true, opacity: op,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    }));
+    s.scale.setScalar(scale);
+    sunGrp.add(s);
+    return s;
+  };
+  const sunCore = mkSunLayer(sunDiscTex, 30, 1);
+  const sunHalo = mkSunLayer(glowTex, 85, 0.5);
+  const sunSpikes = mkSunLayer(sunSpikeTex, 210, 0.4);
+  const sunWhite = new THREE.Color(0xffffff);
+  scene.add(sunGrp);
 
   // ---------------- the machines ----------------
   // showcase display positions (used by the night-time stack section);
@@ -599,7 +637,7 @@ export function createWorld(canvas) {
       Math.sin(elRad) * R,
       Math.cos(elRad) * Math.cos(az) * R,
     );
-    sunSprite.position.copy(sun.position).multiplyScalar(1.9);
+    sunGrp.position.copy(sun.position).multiplyScalar(1.9);
 
     const horizon = 1 - THREE.MathUtils.clamp(Math.abs(el) / 18, 0, 1);
     const daylight = THREE.MathUtils.clamp((el + 4) / 14, 0, 1);
@@ -610,8 +648,15 @@ export function createWorld(canvas) {
     tmpColor.copy(dayColor).lerp(horizonCol, horizon * 0.9);
     sun.color.copy(tmpColor);
     sun.intensity = 4.1 * daylight;
-    sunSprite.material.opacity = daylight * (0.55 + horizon * 0.45);
-    sunSprite.material.color.copy(tmpColor);
+    // disc stays near-white (space sun), halo carries the horizon tint,
+    // spikes sit between; all fade together through the terminator
+    const sunVis = daylight * (0.55 + horizon * 0.45);
+    sunCore.material.opacity = Math.min(1, sunVis * 1.7);
+    sunHalo.material.opacity = sunVis * 0.55;
+    sunSpikes.material.opacity = sunVis * 0.42;
+    sunCore.material.color.copy(tmpColor).lerp(sunWhite, 0.6);
+    sunHalo.material.color.copy(tmpColor);
+    sunSpikes.material.color.copy(tmpColor).lerp(sunWhite, 0.35);
 
     fillSky.intensity = 0.06 + daylight * 0.32;
     earthshine.intensity = 0.08 + night * 0.3;
