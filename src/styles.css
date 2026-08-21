@@ -72,18 +72,7 @@ body {
     radial-gradient(ellipse 120% 90% at 50% 45%, transparent 55%, rgba(3, 4, 8, 0.55) 100%),
     linear-gradient(to bottom, rgba(3,4,8,0.35), transparent 22%, transparent 80%, rgba(3,4,8,0.5));
 }
-/* film grain at dither strength only: masks gradient banding on the
-   dark sky without reading as noise in the black of space */
-#grain {
-  position: fixed; inset: -50%; z-index: 2; pointer-events: none; opacity: 0.018;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: grain 8s steps(10) infinite;
-}
-@keyframes grain {
-  0%, 100% { transform: translate(0,0); } 10% { transform: translate(-5%,-8%); }
-  30% { transform: translate(3%,-12%); } 50% { transform: translate(8%,4%); }
-  70% { transform: translate(-8%,6%); } 90% { transform: translate(5%,10%); }
-}
+/* (film-grain overlay removed — clean blacks) */
 
 /* ============ NAV ============ */
 #nav {
@@ -452,7 +441,6 @@ main { position: relative; z-index: 10; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  #grain { animation: none; }
   .scroll-line::after { animation: none; }
   .reveal, .tick { opacity: 1 !important; transform: none !important; }
   .reveal-lines span > .rl-inner { transform: none !important; }
