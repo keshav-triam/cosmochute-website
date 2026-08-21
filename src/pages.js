@@ -112,5 +112,62 @@ function observeReveals() {
   });
 }
 
+// ---------------- HUD chrome (serials, rails, telemetry, hero lines) ----------------
+const PAGE_CODES = { careers: 'CRW', about: 'DOS', news: 'TLM', partners: 'MFT' };
+function decorateChrome() {
+  // module serials + hover sweep layer on every instrument pane
+  document.querySelectorAll('.pane').forEach((p, i) => {
+    const tag = document.createElement('span');
+    tag.className = 'pane-tag';
+    tag.textContent = `${PAGE_CODES[PAGE] || 'MOD'}-${String(i + 1).padStart(2, '0')}`;
+    p.appendChild(tag);
+    const sweep = document.createElement('span');
+    sweep.className = 'pane-sweep';
+    p.appendChild(sweep);
+  });
+  // vertical side rails
+  const rails = document.createElement('div');
+  rails.innerHTML = `
+    <div class="hrail hrail-l"><span>${PAGE.toUpperCase()} // COSMOCHUTE LEAP</span></div>
+    <div class="hrail hrail-r"><span>REGOLITH NOMINAL · LINK 98.6%</span></div>`;
+  while (rails.firstElementChild) body.appendChild(rails.firstElementChild);
+  // live telemetry strip (reuses the homepage #telemetry styling)
+  const tl = document.createElement('div');
+  tl.id = 'telemetry';
+  tl.innerHTML = `
+    <span><span class="tl-dot"></span>CHANNEL ${(PAGE_CODES[PAGE] || PAGE).toUpperCase()}</span>
+    <span id="tl-rev">DESIGN REV —</span>
+    <span id="tl-clock">—</span>`;
+  body.appendChild(tl);
+  const clockEl = tl.querySelector('#tl-clock');
+  const tick = () => {
+    const d = new Date();
+    clockEl.textContent = `UTC ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}`;
+  };
+  tick();
+  setInterval(tick, 1000);
+  // hero HUD status line inside every version's hero
+  document.querySelectorAll('.page-hero .content-block').forEach((cb) => {
+    const d = document.createElement('div');
+    d.className = 'hero-hud rv';
+    d.innerHTML = `<span class="hh-dot"></span><span>PAGE ${(PAGE_CODES[PAGE] || 'SYS')}</span><span class="hh-rev">DESIGN REV —</span><span>UPLINK ACTIVE</span>`;
+    cb.appendChild(d);
+  });
+}
+
+function stampRev(v) {
+  const name = META[v - 1] ? META[v - 1].name.toUpperCase() : `V${v}`;
+  const rev = document.getElementById('tl-rev');
+  if (rev) rev.textContent = `DESIGN REV V${v} · ${name}`;
+  document.querySelectorAll('.hh-rev').forEach((el) => { el.textContent = `REV V${v} — ${name}`; });
+}
+
+const _setVersion = setVersion;
+setVersion = function (v, push = true) {
+  _setVersion(v, push);
+  stampRev(v);
+};
+
+decorateChrome();
 buildPicker();
 setVersion(currentDefault(), false);
