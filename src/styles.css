@@ -102,6 +102,29 @@ body {
 }
 .nav-cta:hover { background: var(--accent); color: #0a0705; }
 
+/* ============ SECTION INDEX (right edge) ============ */
+#section-rail {
+  position: fixed; right: clamp(0.8rem, 2vw, 1.6rem); top: 5.4rem; z-index: 40;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0.65rem;
+  transition: opacity 0.35s ease;
+}
+/* the pinned mission owns the top-right (stage telemetry lives there) —
+   the section index yields for that stretch and returns after */
+#section-rail.rail-yield { opacity: 0; pointer-events: none; }
+#section-rail a {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  font-family: var(--font-hud); font-size: 0.56rem; letter-spacing: 0.22em;
+  color: var(--ink-faint); text-decoration: none; transition: color 0.25s;
+}
+#section-rail a::after {
+  content: ""; width: 14px; height: 1px; background: currentColor; opacity: 0.6;
+  transition: width 0.25s;
+}
+#section-rail a:hover { color: var(--ink); }
+#section-rail a.active { color: var(--accent); }
+#section-rail a.active::after { width: 26px; box-shadow: 0 0 8px var(--accent); }
+@media (max-width: 900px) { #section-rail { display: none; } }
+
 /* ============ PHASE RAIL ============ */
 #phase-rail {
   position: fixed; right: clamp(0.8rem, 2vw, 1.6rem); top: 50%;

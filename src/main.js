@@ -270,6 +270,28 @@ journeyB = camJourney(
 revealsIn('#capabilities');
 revealsIn('#manifesto');
 
+// --- section index scroll-spy (right-edge rail) ---
+const railEl = document.getElementById('section-rail');
+const railLinks = railEl ? Array.from(railEl.querySelectorAll('a')) : [];
+if (railLinks.length) {
+  const railTargets = railLinks.map((a) => document.querySelector(a.getAttribute('href')));
+  const railTop = (el) => el.getBoundingClientRect().top + window.scrollY;
+  const spy = () => {
+    const y = window.scrollY + window.innerHeight * 0.4;
+    let idx = -1;
+    railTargets.forEach((sec, i) => { if (sec && railTop(sec) <= y) idx = i; });
+    railLinks.forEach((a, i) => a.classList.toggle('active', i === idx));
+    // yield the top-right corner to the pinned mission's stage telemetry
+    if (missionST) {
+      const inPin = window.scrollY >= missionST.start - window.innerHeight * 0.2
+                 && window.scrollY <= missionST.end - window.innerHeight * 0.6;
+      railEl.classList.toggle('rail-yield', inPin);
+    }
+  };
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+}
+
 // ============================================================
 // GLOBAL PHASE DRIVER — plain scroll listener + phase keyframes
 // derived from the real section layout, so the story beats land:
